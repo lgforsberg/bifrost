@@ -1,0 +1,21 @@
+# Binaries
+/bin/
+/bifrost
+*.exe
+*.test
+*.out
+
+# Build / coverage artifacts
+coverage.out
+coverage.html
+
+# Local config & secrets (never commit real credentials)
+config.json
+*.pass
+pass-*
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
