@@ -407,6 +407,16 @@ make vet       # go vet
 make install   # go install ./cmd/bifrost
 ```
 
+## Documentation
+
+| Doc | Purpose |
+|-----|---------|
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How the code fits together, request lifecycle, design decisions |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Dev workflow and step-by-step recipes for adding commands and library methods |
+| [`AGENTS.md`](AGENTS.md) | Fast orientation and the invariants to preserve (for humans and AI agents) |
+| [`mail/README.md`](mail/README.md) | Full `mail` library API reference |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release history |
+
 ## Scripting examples
 
 ```bash
