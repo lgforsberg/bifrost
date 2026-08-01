@@ -115,3 +115,18 @@ are gitignored.
 - Record notable changes in [`CHANGELOG.md`](CHANGELOG.md) (Keep a Changelog format).
 - Versioning follows [SemVer](https://semver.org/). The version string lives in
   `cmd/bifrost/main.go` (`const version`); bump it and tag releases `vX.Y.Z`.
+
+A release is one commit carrying the change, the version bump and the changelog
+entry, tagged at that commit:
+
+```bash
+git tag -a v1.2.3 -m "One line on what shipped"
+git push origin main --follow-tags
+```
+
+Tag as you release, not in a later sweep: the changelog's compare links point at
+these tags, and `go get` resolves library versions from them.
+
+Now that `v1.x` tags exist, `package mail` is a published API. A breaking change
+to it needs a `/v2` module path, so prefer adding to a result type over changing
+a signature.
