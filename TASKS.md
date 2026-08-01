@@ -81,9 +81,9 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NEXT
 
-- **T-013** Integration test suite. The two verified critical bugs would both have been caught
-  here; `imap.go` (the largest file) is essentially untested and the command layer is at 0%.
-  T-006 seeded an in-process SMTP server (`mail/send_smtp_test.go`) to build on.
+- **T-013** Integration test suite. The library half is done and earning its keep; what is left
+  is the command layer, still almost untested, and the two server behaviours `imapmemserver`
+  cannot produce.
   - [x] in-process IMAP server. No need to script one: go-imap ships `imapmemserver`, which
         turned this from an L into an afternoon (`mail/imapserver_test.go`)
   - [x] append and fetch, trash, archive, folder create/rename/delete and their error codes
