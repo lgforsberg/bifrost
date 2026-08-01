@@ -64,6 +64,16 @@ type Message struct {
 	Folder      string       `json:"folder,omitempty"`
 }
 
+// SendResult reports the outcome of a delivery. Handing the message to the
+// server either works or returns an error, but the steps that follow (filing a
+// copy in Sent, removing the draft that was just sent) can fail on their own
+// without the message being un-sent. Those are reported as warnings rather
+// than errors, because failing the call would invite a retry and a duplicate.
+type SendResult struct {
+	MessageID string   `json:"messageId"`
+	Warnings  []string `json:"warnings,omitempty"`
+}
+
 type Folder struct {
 	Name       string   `json:"name"`
 	Delimiter  string   `json:"delimiter"`

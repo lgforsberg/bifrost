@@ -8,56 +8,61 @@ import (
 )
 
 // Send composes a message, delivers it via SMTP, and optionally saves to Sent.
-func Send(ctx context.Context, account AccountConfig, imap *IMAPClient, opts SendOptions, saveToSent bool, logger *slog.Logger) error {
+// A failure to file the Sent copy is reported in the result, not returned: the
+// message is already delivered by then.
+func Send(ctx context.Context, account AccountConfig, imap *IMAPClient, opts SendOptions, saveToSent bool, logger *slog.Logger) (SendResult, error) {
 	// Pinned up front so the delivered bytes and the archived Sent copy, which
 	// are composed separately, share one Message-ID.
 	if opts.MessageID == "" {
 		opts.MessageID = GenerateMessageID()
 	}
+	result := SendResult{MessageID: opts.MessageID}
 
 	composed, err := ComposeMessage(opts)
 	if err != nil {
-		return fmt.Errorf("composing message: %w", err)
+		return result, fmt.Errorf("composing message: %w", err)
 	}
 
 	recipients := collectRecipients(opts)
 	if len(recipients) == 0 {
-		return fmt.Errorf("no recipients specified: %w", ErrInvalidConfig)
+		return result, fmt.Errorf("no recipients specified: %w", ErrInvalidConfig)
 	}
 	if err := SmtpDeliver(ctx, account, opts.From.Address, composed, recipients, logger); err != nil {
-		return err
+		return result, err
 	}
 
 	if saveToSent && imap != nil {
-		appendToSent(ctx, imap, opts, composed, logger)
+		result.Warnings = append(result.Warnings, appendToSent(ctx, imap, opts, composed)...)
 	}
 
-	return nil
+	return result, nil
 }
 
-// appendToSent files a copy of a delivered message in the Sent folder. The
-// archived copy keeps the Bcc header that the delivered bytes omit, so the
-// sender retains a record of who was blind-copied.
-func appendToSent(ctx context.Context, imap *IMAPClient, opts SendOptions, delivered []byte, logger *slog.Logger) {
+// appendToSent files a copy of a delivered message in the Sent folder and
+// describes anything that went wrong instead of failing, since nothing here
+// can un-send the message. The archived copy keeps the Bcc header that the
+// delivered bytes omit, so the sender retains a record of who was blind-copied.
+func appendToSent(ctx context.Context, imap *IMAPClient, opts SendOptions, delivered []byte) []string {
 	sentFolder, err := imap.FindSpecialFolder(ctx, "\\Sent")
 	if err != nil {
-		logger.Debug("sent folder not found, skipping save", "err", err)
-		return
+		return []string{fmt.Sprintf("message was delivered, but no Sent folder was found to file a copy in: %v", err)}
 	}
 
+	var warnings []string
 	archived := delivered
 	if len(opts.Bcc) > 0 {
 		withBcc, err := composeMessage(opts, true)
 		if err != nil {
-			logger.Debug("composing archival copy failed, saving delivered copy", "err", err)
+			warnings = append(warnings, fmt.Sprintf("the copy filed in %s does not record the Bcc recipients: %v", sentFolder, err))
 		} else {
 			archived = withBcc
 		}
 	}
 
 	if _, err := imap.AppendMessage(ctx, sentFolder, archived, []string{"\\Seen"}); err != nil {
-		logger.Debug("failed to save to sent", "err", err)
+		warnings = append(warnings, fmt.Sprintf("message was delivered, but the copy could not be filed in %s: %v", sentFolder, err))
 	}
+	return warnings
 }
 
 // BuildReply constructs SendOptions for a reply to the given message.
@@ -154,8 +159,10 @@ func SaveDraft(ctx context.Context, imap *IMAPClient, opts SendOptions, keywords
 	return uid, nil
 }
 
-// SendDraft fetches a draft, delivers it, removes from Drafts, and saves to Sent.
-func SendDraft(ctx context.Context, account AccountConfig, imap *IMAPClient, uid uint32, logger *slog.Logger) error {
+// SendDraft fetches a draft, delivers it, removes from Drafts, and saves to
+// Sent. Failures in the two cleanup steps are reported in the result rather
+// than returned, since the message has already gone out by then.
+func SendDraft(ctx context.Context, account AccountConfig, imap *IMAPClient, uid uint32, logger *slog.Logger) (SendResult, error) {
 	draftsFolder, err := imap.FindSpecialFolder(ctx, "\\Drafts")
 	if err != nil {
 		draftsFolder = "Drafts"
@@ -163,7 +170,7 @@ func SendDraft(ctx context.Context, account AccountConfig, imap *IMAPClient, uid
 
 	msg, err := imap.FetchMessage(ctx, draftsFolder, uid, true)
 	if err != nil {
-		return fmt.Errorf("fetching draft: %w", err)
+		return SendResult{}, fmt.Errorf("fetching draft: %w", err)
 	}
 
 	// Re-compose from the parsed draft to ensure well-formed output. The
@@ -183,27 +190,29 @@ func SendDraft(ctx context.Context, account AccountConfig, imap *IMAPClient, uid
 		MessageID:   GenerateMessageID(),
 	}
 
+	result := SendResult{MessageID: opts.MessageID}
+
 	composed, err := ComposeMessage(opts)
 	if err != nil {
-		return fmt.Errorf("composing draft for send: %w", err)
+		return result, fmt.Errorf("composing draft for send: %w", err)
 	}
 
 	recipients := collectRecipients(opts)
 	if len(recipients) == 0 {
-		return fmt.Errorf("draft has no recipients: %w", ErrInvalidConfig)
+		return result, fmt.Errorf("draft has no recipients: %w", ErrInvalidConfig)
 	}
 	if err := SmtpDeliver(ctx, account, opts.From.Address, composed, recipients, logger); err != nil {
-		return err
+		return result, err
 	}
 
-	// Remove from Drafts
 	if err := imap.DeleteMessage(ctx, draftsFolder, uid); err != nil {
-		logger.Debug("failed to delete sent draft", "err", err)
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("message was sent, but the draft is still in %s: %v", draftsFolder, err))
 	}
 
-	appendToSent(ctx, imap, opts, composed, logger)
+	result.Warnings = append(result.Warnings, appendToSent(ctx, imap, opts, composed)...)
 
-	return nil
+	return result, nil
 }
 
 func collectRecipients(opts SendOptions) []string {

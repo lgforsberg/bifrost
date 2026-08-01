@@ -61,7 +61,6 @@ func Send(g *cmdutil.GlobalFlags, args []string) error {
 		from.Address = *fromAddr
 	}
 
-	msgID := mail.GenerateMessageID()
 	opts := mail.SendOptions{
 		From:        from,
 		To:          parseAddressFlags(toFlag),
@@ -70,7 +69,6 @@ func Send(g *cmdutil.GlobalFlags, args []string) error {
 		Subject:     *subject,
 		TextBody:    body,
 		Attachments: attachments,
-		MessageID:   msgID,
 	}
 
 	client, _, err := helpers.ConnectIMAP(g.Ctx, g.Config, g.Account, g.Logger)
@@ -80,15 +78,38 @@ func Send(g *cmdutil.GlobalFlags, args []string) error {
 	defer client.Close()
 
 	saveToSent := g.Config.Defaults.SaveToSent && !*noSave
-	if err := mail.Send(g.Ctx, *acct, client, opts, saveToSent, g.Logger); err != nil {
+	res, err := mail.Send(g.Ctx, *acct, client, opts, saveToSent, g.Logger)
+	if err != nil {
 		return err
 	}
 
+	return reportSend(g, res, "Message sent.")
+}
+
+// sendResponse is the JSON shape shared by the commands that deliver a
+// message. Warnings describe follow-up steps that failed after delivery
+// succeeded, so they never change the status or the exit code.
+type sendResponse struct {
+	Status    string   `json:"status"`
+	MessageID string   `json:"messageId,omitempty"`
+	Warnings  []string `json:"warnings,omitempty"`
+}
+
+// reportSend writes the outcome in whichever output mode is active. In table
+// mode warnings go to stderr, keeping stdout usable in a pipeline.
+func reportSend(g *cmdutil.GlobalFlags, res mail.SendResult, humanMsg string) error {
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, map[string]string{"status": "sent", "messageId": msgID})
-	} else {
-		fmt.Println("Message sent.")
+		return output.PrintJSON(os.Stdout, sendResponse{
+			Status:    "sent",
+			MessageID: res.MessageID,
+			Warnings:  res.Warnings,
+		})
 	}
+
+	for _, w := range res.Warnings {
+		fmt.Fprintf(os.Stderr, "warning: %s\n", w)
+	}
+	fmt.Println(humanMsg)
 	return nil
 }
 

@@ -3,11 +3,9 @@ package commands
 import (
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
 	"github.com/lgforsberg/bifrost/internal/helpers"
-	"github.com/lgforsberg/bifrost/internal/output"
 	"github.com/lgforsberg/bifrost/mail"
 )
 
@@ -67,18 +65,11 @@ func Reply(g *cmdutil.GlobalFlags, args []string) error {
 	if *fromAddr != "" {
 		opts.From.Address = *fromAddr
 	}
-	msgID := mail.GenerateMessageID()
-	opts.MessageID = msgID
-
 	saveToSent := g.Config.Defaults.SaveToSent && !*noSave
-	if err := mail.Send(g.Ctx, *acct, client, opts, saveToSent, g.Logger); err != nil {
+	res, err := mail.Send(g.Ctx, *acct, client, opts, saveToSent, g.Logger)
+	if err != nil {
 		return err
 	}
 
-	if g.JSON {
-		return output.PrintJSON(os.Stdout, map[string]string{"status": "sent", "messageId": msgID})
-	} else {
-		fmt.Println("Reply sent.")
-	}
-	return nil
+	return reportSend(g, res, "Reply sent.")
 }

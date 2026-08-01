@@ -6,6 +6,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-01
+
+### Added
+
+- `send`, `reply`, `forward` and `draft send` report a `warnings` array when a
+  step after delivery fails, such as filing the copy in Sent or removing a sent
+  draft. Previously those were logged at debug level, so the command reported
+  clean success when no Sent copy had been written. The status stays `sent` and
+  the exit code stays 0, because the message did go out and a retry would send
+  it twice. In table mode the warnings go to stderr.
+- `draft send --json` now reports the `messageId` it delivered with, matching
+  the other send commands.
+
+### Changed
+
+- **Library callers:** `mail.Send` and `mail.SendDraft` return a `SendResult`
+  alongside the error, carrying the Message-ID and any warnings. Both used to
+  return only an error.
+
 ## [1.3.0] - 2026-08-01
 
 ### Added
@@ -108,7 +127,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/lgforsberg/bifrost/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/lgforsberg/bifrost/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/lgforsberg/bifrost/compare/v1.1.4...v1.2.0
 [1.1.4]: https://github.com/lgforsberg/bifrost/compare/v1.1.3...v1.1.4

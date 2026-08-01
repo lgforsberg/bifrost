@@ -3,7 +3,7 @@
 **This file is the single source of truth for what we are working on.** If a task is not
 here, it is not tracked. If it is here, its phase and metadata are current.
 
-> **Next free ID: `T-034`** · IDs are never reused · last full verification sweep **2026-08-01**
+> **Next free ID: `T-035`** · IDs are never reused · last full verification sweep **2026-08-01**
 
 ## How to use this file
 
@@ -81,10 +81,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NEXT
 
-- **T-006** Surface save-to-Sent and draft-cleanup failures instead of Debug-logging them:
-  `send`/`reply`/`forward`/`draft send` currently report clean success when the Sent copy was
-  never written. Warn on stderr and add a field to the JSON result.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/operations.go:appendToSent`
 - **T-007** Replace substring error classification with typed errors: `errors.As` on
   `*smtp.SMTPError` codes, IMAP response codes for `ALREADYEXISTS`/`NONEXISTENT`/mailbox
   checks. Today any error containing "auth" maps to `AUTH_FAILED`.
@@ -109,16 +105,22 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/read.go:Read`
 - **T-013** Integration test suite. The two verified critical bugs would both have been caught
   here; `imap.go` (the largest file) is essentially untested and the command layer is at 0%.
+  T-006 seeded an in-process SMTP server (`mail/send_smtp_test.go`) to build on.
   - [ ] fake/scripted IMAP server covering FetchMessage, DeleteMessages, Search, special folders
+  - [ ] the T-006 warning paths: a Sent append that fails, a draft that will not delete
   - [ ] golden-file tests for each command's JSON output and error codes
   ↳ since 2026-08-01 · pushed 0 · size L · verified 2026-08-01 · ref `mail/imap.go`
-- **T-014** Docs accuracy pass: README claims per-account defaults that do not exist, documents
-  `<id@bifrost>` Message-IDs while we emit the real hostname, and does not mention the go-imap
-  beta dependency. Fix the claims or implement them (per-account defaults may become its own task).
+- **T-014** Docs accuracy pass: README claims per-account defaults that do not exist and does not
+  mention the go-imap beta dependency. Fix the claims or implement them (per-account defaults may
+  become its own task).
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `README.md`
 
 ## LATER
 
+- **T-034** `draft send` ignores the `saveToSent` default and has no `--no-save`, so it always
+  files a Sent copy while `send`/`reply`/`forward` all honour the setting. Either thread the
+  config through `SendDraft` or document the difference deliberately.
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/operations.go:SendDraft`
 - **T-033** Make the network timeouts configurable. T-004 hardcodes a 30s dial and a 60s idle
   deadline, which is right for interactive use but arbitrary: a large attachment over a slow
   link is fine (the deadline is per read, not total) but an agent may want to fail faster, and
@@ -192,6 +194,14 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-006** A send that could not be filed in Sent says so. `Send` and `SendDraft` return a
+  `SendResult` carrying the Message-ID and any warnings; the commands print those to stderr, or
+  as a `warnings` array in JSON. Delivery still reports success and exit 0, since retrying a
+  delivered message would send it twice.
+  ↳ done 2026-08-01 · evidence: `TestSend_DeliversOverPlaintext` runs the send path against an
+  in-process SMTP server and checks the reported Message-ID is the one delivered; the warning
+  paths themselves need the IMAP side of T-013 to cover. Library callers change: both functions
+  gained a return value. v1.4.0
 - **T-005** `draft send` keeps its blind recipients. `ParseMessage` now reads the `Bcc` header
   back off the stored draft, which T-001 had already made sure was written, and `read` reports
   it for the copies that carry it.

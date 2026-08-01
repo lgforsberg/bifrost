@@ -192,16 +192,12 @@ func draftSend(g *cmdutil.GlobalFlags, args []string) error {
 	}
 	defer client.Close()
 
-	if err := mail.SendDraft(g.Ctx, *acct, client, uids[0], g.Logger); err != nil {
+	res, err := mail.SendDraft(g.Ctx, *acct, client, uids[0], g.Logger)
+	if err != nil {
 		return err
 	}
 
-	if g.JSON {
-		return output.PrintJSON(os.Stdout, map[string]string{"status": "sent"})
-	} else {
-		fmt.Println("Draft sent.")
-	}
-	return nil
+	return reportSend(g, res, "Draft sent.")
 }
 
 func draftDelete(g *cmdutil.GlobalFlags, args []string) error {

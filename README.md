@@ -248,7 +248,9 @@ bifrost send --to ADDR [--to ADDR...] --subject TEXT [--cc ADDR...] [--bcc ADDR.
 | `--attach` | No | Attachment file path (repeatable) |
 | `--no-save` | No | Don't save a copy to Sent |
 
-JSON output: `{"status": "sent", "messageId": "<id@bifrost>"}`.
+JSON output: `{"status": "sent", "messageId": "uuid@hostname"}`.
+
+`reply`, `forward` and `draft send` report the same shape. When a step after delivery fails, such as filing the copy in Sent or removing a sent draft, the result gains a `warnings` array describing each one. The status stays `sent` and the exit code stays 0, because the message did go out and retrying would send it twice. In table mode those warnings go to stderr, leaving stdout clean.
 
 #### `reply` — Reply to a message
 
@@ -387,7 +389,15 @@ func main() {
 	msg, _ := client.FetchMessage(ctx, "INBOX", envelopes[0].UID, true)
 
 	opts := mail.BuildReply(account, msg, "Thanks!", false, true)
-	_ = mail.Send(ctx, account, client, opts, true, logger)
+	res, err := mail.Send(ctx, account, client, opts, true, logger)
+	if err != nil {
+		panic(err)
+	}
+	// The message is delivered by this point. Anything in res.Warnings is a
+	// follow-up step that failed, such as filing the copy in Sent.
+	for _, w := range res.Warnings {
+		logger.Warn(w)
+	}
 }
 ```
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log/slog"
 	"net"
 	"os"
 	"strconv"
@@ -151,7 +150,7 @@ func TestIMAPConnect_CancellationInterruptsSilentServer(t *testing.T) {
 		IMAPPort:       port,
 		IMAPEncryption: "none",
 		Password:       "secret",
-	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	}, discardLogger())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
