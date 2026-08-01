@@ -6,6 +6,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-08-01
+
+### Fixed
+
+- SMTP failures are classified by status code instead of by searching the
+  message for substrings. A refusal worded `550 Not authorized to send as this
+  address` was reported as `AUTH_FAILED`, sending the caller to check
+  credentials that were never the problem; it now reports `SEND_REJECTED`. A
+  4xx reply asks for a retry and is no longer reported as a permanent refusal,
+  and a connection that breaks mid-exchange is no longer reported as a refusal
+  by a server that never answered.
+- A login or greeting that fails because the connection broke reports
+  `CONNECTION_FAILED` rather than `AUTH_FAILED`.
+- IMAP folder errors read the `ALREADYEXISTS` and `NONEXISTENT` response codes
+  off the typed error rather than matching them in the rendered string, so the
+  result no longer depends on how the library formats one. The wording fallback
+  stays, because plenty of servers answer with a bare `NO` and no code.
+- A `QUIT` that fails after the server accepted the message is no longer
+  reported as a send failure. The message is delivered by that point, and
+  reporting a failure invited a retry that would deliver it twice.
+
 ## [1.4.0] - 2026-08-01
 
 ### Added
@@ -127,7 +148,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/lgforsberg/bifrost/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/lgforsberg/bifrost/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/lgforsberg/bifrost/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/lgforsberg/bifrost/compare/v1.1.4...v1.2.0

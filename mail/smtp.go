@@ -3,11 +3,11 @@ package mail
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"strconv"
-	"strings"
 
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
@@ -48,35 +48,45 @@ func SmtpDeliver(ctx context.Context, config AccountConfig, from string, compose
 	}
 	defer client.Close()
 
+	// Greet explicitly. Extension swallows the greeting error, so a connection
+	// that died on arrival would otherwise be reported as a server that does
+	// not support AUTH. The name matches what the library sends by default.
+	if err := client.Hello("localhost"); err != nil {
+		return classifySMTPError("greeting", err, ErrConnectionFailed)
+	}
 	if ok, _ := client.Extension("AUTH"); !ok {
 		return fmt.Errorf("SMTP server %s does not support AUTH: %w", addr, ErrAuthFailed)
 	}
 	if err := client.Auth(sasl.NewPlainClient("", username, config.Password)); err != nil {
-		return classifySMTPError(err)
+		return classifySMTPError("auth", err, ErrAuthFailed)
 	}
 	if err := client.SendMail(from, recipients, bytes.NewReader(composedMsg)); err != nil {
-		return classifySMTPError(err)
+		return classifySMTPError("send", err, ErrSendRejected)
 	}
+
+	// The server has accepted the message by this point. Failing to close down
+	// cleanly does not un-deliver it, and reporting an error here would invite
+	// a retry that delivers it twice.
 	if err := client.Quit(); err != nil {
-		return classifySMTPError(err)
+		logger.Debug("SMTP quit failed after the message was accepted", "err", err)
 	}
 
 	logger.Debug("SMTP delivery complete", "recipients", recipients)
 	return nil
 }
 
-// classifySMTPError maps a delivery failure onto a sentinel. The matching is
-// textual because the server's reply reaches us as an opaque string.
-func classifySMTPError(err error) error {
-	errStr := strings.ToLower(err.Error())
-	switch {
-	case strings.Contains(errStr, "authentication") || strings.Contains(errStr, "auth"):
-		return fmt.Errorf("SMTP auth: %w: %w", err, ErrAuthFailed)
-	case strings.Contains(errStr, "550") || strings.Contains(errStr, "553") || strings.Contains(errStr, "rejected"):
-		return fmt.Errorf("SMTP send: %w: %w", err, ErrSendRejected)
-	case strings.Contains(errStr, "dial") || strings.Contains(errStr, "connection") || strings.Contains(errStr, "timeout"):
-		return fmt.Errorf("SMTP connect: %w: %w", err, ErrConnectionFailed)
-	default:
-		return fmt.Errorf("SMTP send: %w", err)
+// classifySMTPError maps a failure at the named stage onto a sentinel. A reply
+// from the server carries a status code and tells us what it thought of the
+// request; anything else means the exchange itself broke, whatever stage it
+// reached. The rejected sentinel applies when the server answered and refused
+// permanently: a 4xx is the server asking for a retry, not a refusal.
+func classifySMTPError(stage string, err error, rejected error) error {
+	var smtpErr *smtp.SMTPError
+	if !errors.As(err, &smtpErr) {
+		return fmt.Errorf("SMTP %s: %w: %w", stage, err, ErrConnectionFailed)
 	}
+	if smtpErr.Code >= 500 {
+		return fmt.Errorf("SMTP %s: %w: %w", stage, err, rejected)
+	}
+	return fmt.Errorf("SMTP %s: %w", stage, err)
 }

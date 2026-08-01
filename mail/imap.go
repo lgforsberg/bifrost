@@ -3,6 +3,7 @@ package mail
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -57,6 +58,12 @@ func (c *IMAPClient) Connect(ctx context.Context) error {
 	if err := client.Login(username, c.config.Password).Wait(); err != nil {
 		release()
 		client.Close()
+		// The server refusing the credentials is an auth failure; the exchange
+		// breaking part way through is not, and saying so sends the caller off
+		// checking a password that was never the problem.
+		if !isStatusResponse(err) {
+			return fmt.Errorf("login as %s: %w: %w", username, err, ErrConnectionFailed)
+		}
 		return fmt.Errorf("login as %s: %w: %w", username, err, ErrAuthFailed)
 	}
 
@@ -328,15 +335,39 @@ func (c *IMAPClient) DeleteFolder(ctx context.Context, name string) error {
 }
 
 func classifyFolderError(op, name string, err error) error {
-	msg := err.Error()
-	switch {
-	case strings.Contains(msg, "ALREADYEXISTS"):
+	switch imapResponseCode(err) {
+	case imap.ResponseCodeAlreadyExists:
 		return fmt.Errorf("folder %q already exists: %w", name, ErrAlreadyExists)
-	case strings.Contains(msg, "NONEXISTENT"):
+	case imap.ResponseCodeNonExistent:
 		return fmt.Errorf("folder %q does not exist: %w", name, ErrNotFound)
-	default:
-		return fmt.Errorf("folder %s %q: %w", op, name, err)
 	}
+
+	// Response codes are optional and plenty of servers answer with a bare NO,
+	// so the wording is still worth a look before giving up.
+	switch {
+	case isNoSuchMailbox(err):
+		return fmt.Errorf("folder %q does not exist: %w", name, ErrNotFound)
+	case mentionsAlreadyExists(err):
+		return fmt.Errorf("folder %q already exists: %w", name, ErrAlreadyExists)
+	}
+	return fmt.Errorf("folder %s %q: %w", op, name, err)
+}
+
+// imapResponseCode returns the code the server attached to a tagged NO or BAD,
+// or the empty string if this is not a status response or carried no code.
+func imapResponseCode(err error) imap.ResponseCode {
+	var imapErr *imap.Error
+	if errors.As(err, &imapErr) {
+		return imapErr.Code
+	}
+	return ""
+}
+
+// isStatusResponse reports whether the server answered at all, as opposed to
+// the exchange breaking underneath us.
+func isStatusResponse(err error) bool {
+	var imapErr *imap.Error
+	return errors.As(err, &imapErr)
 }
 
 func (c *IMAPClient) AppendMessage(ctx context.Context, folder string, message []byte, flags []string) (uint32, error) {
@@ -642,10 +673,21 @@ func buildIMAPSearchCriteria(criteria SearchCriteria) *imap.SearchCriteria {
 	return sc
 }
 
+// isNoSuchMailbox reports whether the server said the mailbox is missing. The
+// NONEXISTENT response code is the reliable signal; the wording below is the
+// fallback for the many servers that do not send one.
 func isNoSuchMailbox(err error) bool {
+	if imapResponseCode(err) == imap.ResponseCodeNonExistent {
+		return true
+	}
 	s := strings.ToLower(err.Error())
 	return strings.Contains(s, "no such mailbox") ||
 		strings.Contains(s, "doesn't exist") ||
 		strings.Contains(s, "not found") ||
 		strings.Contains(s, "nonexistent")
+}
+
+// mentionsAlreadyExists is the wording fallback for ALREADYEXISTS.
+func mentionsAlreadyExists(err error) bool {
+	return strings.Contains(strings.ToLower(err.Error()), "already exists")
 }

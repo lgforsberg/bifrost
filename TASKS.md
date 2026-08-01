@@ -81,10 +81,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NEXT
 
-- **T-007** Replace substring error classification with typed errors: `errors.As` on
-  `*smtp.SMTPError` codes, IMAP response codes for `ALREADYEXISTS`/`NONEXISTENT`/mailbox
-  checks. Today any error containing "auth" maps to `AUTH_FAILED`.
-  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/smtp.go:classifySMTPError`
 - **T-008** 🧭 Give `delete` trash semantics: move to `\Trash` by default, expunge only with
   `--permanent`. Decision needed: change the default of a shipped command, or add the safe
   path behind a flag only.
@@ -194,6 +190,14 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-007** Errors are classified from status codes, not substrings. SMTP maps on the reply code
+  and the stage it failed at; IMAP reads the response code off the typed error, keeping the
+  wording as a fallback for servers that send a bare `NO`.
+  ↳ done 2026-08-01 · evidence: the old classifier called both `550 Not authorized to send as
+  this address` and `553 Sender address not authorized` AUTH_FAILED, which sends an agent to
+  check working credentials; `TestSmtpDeliver_ClassifiesByStatusCode` pins those to
+  SEND_REJECTED and keeps 4xx off it, and `TestSmtpDeliver_BrokenConnectionIsNotARejection`
+  covers a server that never answers. v1.4.1
 - **T-006** A send that could not be filed in Sent says so. `Send` and `SendDraft` return a
   `SendResult` carrying the Message-ID and any warnings; the commands print those to stderr, or
   as a `warnings` array in JSON. Delivery still reports success and exit 0, since retrying a
