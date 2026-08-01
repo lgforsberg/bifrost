@@ -78,10 +78,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NOW
 
-- **T-003** Close the path traversal in `read --save-attachments`: sender-controlled filenames
-  are joined unsanitized, so `../../` escapes the target directory. `filepath.Base` plus a
-  post-clean containment check, with tests for traversal and absolute-path names.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/read.go:55`
 - **T-004** Add real timeouts and cancellation to the network layer. The three timeout consts
   in `imap.go` are dead code and every `ctx` parameter is ignored, so a stalled server hangs
   bifrost forever and Ctrl-C is a no-op.
@@ -174,9 +170,9 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   separately whether a partial attachment should be surfaced or withheld as a corrupt file.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/mime.go:70`
 - **T-026** Code hygiene batch: rune-safe `truncate`; `filepath.Ext` over `fileExtension`;
-  attachment dedupe increments the wrong map key; unchecked `int64`→`uint32` casts; global flag
-  parser silently drops a missing `--account`/`--config` value; version from build info instead
-  of a hand-maintained const; Message-ID should not embed the real hostname.
+  unchecked `int64`→`uint32` casts; global flag parser silently drops a missing
+  `--account`/`--config` value; version from build info instead of a hand-maintained const;
+  Message-ID should not embed the real hostname.
   ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `internal/commands/inbox.go:78`
 
 ## GATED
@@ -201,6 +197,12 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-003** Attachments can no longer be written outside the target directory. Sender-supplied
+  names are reduced to a bare file name, collisions are suffixed rather than overwritten, and
+  the save routine moved to `internal/helpers` where it is directly testable.
+  ↳ done 2026-08-01 · evidence: `TestSaveAttachments_ContainsHostileNames` covers traversal,
+  absolute, Windows and degenerate names; a naive-join reproduction wrote clean outside the
+  temp root, the new path does not; also closes the dedupe bug listed under T-026; v1.1.4
 - **T-031** Mail in a non-UTF-8 charset parses again. Registering the go-message charset
   decoders fixes `iso-8859-1` and `windows-1252` messages, which errored out when single-part
   and read as empty when multipart.

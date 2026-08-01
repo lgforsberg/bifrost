@@ -4,8 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
 	"github.com/lgforsberg/bifrost/internal/helpers"
@@ -48,25 +46,8 @@ func Read(g *cmdutil.GlobalFlags, args []string) error {
 	}
 
 	if *saveAttachments != "" {
-		if err := os.MkdirAll(*saveAttachments, 0755); err != nil {
-			return fmt.Errorf("creating attachment directory: %w", err)
-		}
-		usedNames := make(map[string]int)
-		for i, att := range msg.Attachments {
-			name := att.Filename
-			if name == "" {
-				name = fmt.Sprintf("attachment-%d.bin", i)
-			}
-			if n, exists := usedNames[name]; exists {
-				ext := filepath.Ext(name)
-				base := strings.TrimSuffix(name, ext)
-				name = fmt.Sprintf("%s-%d%s", base, n, ext)
-			}
-			usedNames[att.Filename]++
-			path := filepath.Join(*saveAttachments, name)
-			if err := os.WriteFile(path, att.Data, 0644); err != nil {
-				return fmt.Errorf("saving attachment %s: %w", name, err)
-			}
+		if err := helpers.SaveAttachments(*saveAttachments, msg.Attachments); err != nil {
+			return err
 		}
 	}
 

@@ -6,6 +6,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-08-01
+
+### Security
+
+- `read --save-attachments` can no longer write outside the target directory.
+  Attachment names come from the sender and were joined to the directory
+  unchanged, so a name such as `../../.ssh/authorized_keys` escaped it. Names
+  are now reduced to a bare file name, and files are written mode 0600 into a
+  directory created 0700 instead of being world-readable.
+
+### Fixed
+
+- Attachments whose names collide no longer overwrite each other. Reducing
+  sender names to a bare file name makes collisions more likely, since distinct
+  paths can share a base name, so each file now gets a free name.
+
 ## [1.1.3] - 2026-08-01
 
 ### Fixed
@@ -58,7 +74,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.1.3...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.1.4...HEAD
+[1.1.4]: https://github.com/lgforsberg/bifrost/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/lgforsberg/bifrost/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/lgforsberg/bifrost/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/lgforsberg/bifrost/compare/v1.1.0...v1.1.1

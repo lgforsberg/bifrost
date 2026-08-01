@@ -202,6 +202,8 @@ bifrost read [--folder FOLDER] [--peek] [--no-attachments] [--save-attachments D
 
 By default `read` marks the message seen. Use `--peek` (or `peekOnRead: true`) to read without side effects.
 
+`--save-attachments` reduces each sender-supplied filename to a bare file name, so an attachment can never be written outside the given directory. Colliding names are suffixed rather than overwritten. Files are written mode 0600 into a directory created 0700.
+
 #### `search` — Server-side IMAP search
 
 ```
