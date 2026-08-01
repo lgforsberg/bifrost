@@ -62,7 +62,9 @@ Run `bifrost config init` to generate a template.
     "peekOnRead": false,
     "saveToSent": true,
     "sentFolder": "",
-    "draftsFolder": ""
+    "draftsFolder": "",
+    "trashFolder": "",
+    "archiveFolder": ""
   },
   "accounts": [
     {
@@ -87,6 +89,10 @@ Run `bifrost config init` to generate a template.
 | `saveToSent` | `true` | Save sent messages to the Sent folder |
 | `sentFolder` | `""` | Override Sent folder name (auto-detected via IMAP if empty) |
 | `draftsFolder` | `""` | Override Drafts folder name (auto-detected via IMAP if empty) |
+| `trashFolder` | `""` | Override Trash folder name (auto-detected via IMAP if empty) |
+| `archiveFolder` | `""` | Override Archive folder name (auto-detected via IMAP if empty) |
+
+Leave the folder overrides empty unless you need them. Bifrost otherwise asks the server which folder is which, via the IMAP special-use attributes, which is correct on localized and renamed accounts too. An override wins over the server's answer, and the folder is used as given: if it does not exist, the command that needs it says so rather than guessing.
 
 **Account fields:**
 

@@ -99,6 +99,63 @@ func TestLoad_DefaultsExplicitFalse(t *testing.T) {
 	}
 }
 
+// These were parsed and documented but never reached the account, so
+// configuring them did nothing at all.
+func TestLoad_SpecialFolderOverridesReachTheAccount(t *testing.T) {
+	path := writeConfig(t, `{
+		"defaults": {
+			"sentFolder": "Skickat",
+			"draftsFolder": "Utkast",
+			"trashFolder": "Papperskorg",
+			"archiveFolder": "Arkiv"
+		},
+		"accounts": [{
+			"address": "a@example.com",
+			"imap": {"host": "imap.example.com"},
+			"smtp": {"host": "smtp.example.com"},
+			"password": "secret"
+		}]
+	}`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	a := cfg.Accounts[0]
+	for attr, want := range map[string]string{
+		"\\Sent":    "Skickat",
+		"\\Drafts":  "Utkast",
+		"\\Trash":   "Papperskorg",
+		"\\Archive": "Arkiv",
+	} {
+		if got := a.SpecialFolderOverride(attr); got != want {
+			t.Errorf("override for %s = %q, want %q", attr, got, want)
+		}
+	}
+}
+
+func TestLoad_NoOverridesLeavesResolutionToTheServer(t *testing.T) {
+	path := writeConfig(t, `{
+		"accounts": [{
+			"address": "a@example.com",
+			"imap": {"host": "imap.example.com"},
+			"smtp": {"host": "smtp.example.com"},
+			"password": "secret"
+		}]
+	}`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	a := cfg.Accounts[0]
+	for _, attr := range []string{"\\Sent", "\\Drafts", "\\Trash", "\\Archive", "\\Junk"} {
+		if got := a.SpecialFolderOverride(attr); got != "" {
+			t.Errorf("override for %s = %q, want none", attr, got)
+		}
+	}
+}
+
 func TestLoad_MissingAddress(t *testing.T) {
 	path := writeConfig(t, `{
 		"accounts": [{

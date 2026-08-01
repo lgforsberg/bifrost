@@ -29,6 +29,30 @@ type AccountConfig struct {
 	SMTPEncryption string
 	Username       string // defaults to Address if empty
 	Password       string
+
+	// Special folder overrides. Empty means "ask the server", which is the
+	// right answer almost always; these exist for accounts where the server
+	// advertises nothing and the conventional names do not fit either.
+	SentFolder    string
+	DraftsFolder  string
+	TrashFolder   string
+	ArchiveFolder string
+}
+
+// SpecialFolderOverride returns the folder configured for a special-use
+// attribute, or "" when the account leaves the choice to the server.
+func (a *AccountConfig) SpecialFolderOverride(attr string) string {
+	switch strings.ToLower(attr) {
+	case "\\sent":
+		return a.SentFolder
+	case "\\drafts":
+		return a.DraftsFolder
+	case "\\trash":
+		return a.TrashFolder
+	case "\\archive":
+		return a.ArchiveFolder
+	}
+	return ""
 }
 
 func (a *AccountConfig) EffectiveUsername() string {

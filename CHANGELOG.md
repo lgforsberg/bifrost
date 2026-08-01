@@ -6,6 +6,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-08-01
+
+### Fixed
+
+- `sentFolder` and `draftsFolder` do something. Both were parsed, documented
+  and then dropped on the way to the account, so configuring either had no
+  effect whatsoever.
+
+### Added
+
+- `trashFolder` and `archiveFolder` overrides, for symmetry now that `delete`
+  and `archive` resolve those folders. An override wins over the server's
+  special-use attribute and is used as given.
+- `mail.AccountConfig` carries the four overrides, with
+  `SpecialFolderOverride` to read them.
+
 ## [1.8.0] - 2026-08-01
 
 ### Changed
@@ -214,7 +230,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/lgforsberg/bifrost/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/lgforsberg/bifrost/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/lgforsberg/bifrost/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/lgforsberg/bifrost/compare/v1.5.0...v1.6.0

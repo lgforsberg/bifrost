@@ -547,6 +547,14 @@ func (c *IMAPClient) searchAndCollect(ctx context.Context, folder string, sc *im
 }
 
 func (c *IMAPClient) FindSpecialFolder(ctx context.Context, attr string) (string, error) {
+	// An explicit override wins outright, including over what the server
+	// advertises. It exists precisely for accounts where that is wrong, so
+	// second-guessing it would defeat the point. Whether the folder exists is
+	// left to the caller, which either creates it or fails naming it.
+	if name := c.config.SpecialFolderOverride(attr); name != "" {
+		return name, nil
+	}
+
 	folders, err := c.ListFolders(ctx)
 	if err != nil {
 		return "", err

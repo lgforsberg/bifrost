@@ -11,11 +11,13 @@ import (
 )
 
 type Defaults struct {
-	QuoteReplies bool   `json:"quoteReplies"`
-	PeekOnRead   bool   `json:"peekOnRead"`
-	SaveToSent   bool   `json:"saveToSent"`
-	SentFolder   string `json:"sentFolder"`
-	DraftsFolder string `json:"draftsFolder"`
+	QuoteReplies  bool   `json:"quoteReplies"`
+	PeekOnRead    bool   `json:"peekOnRead"`
+	SaveToSent    bool   `json:"saveToSent"`
+	SentFolder    string `json:"sentFolder"`
+	DraftsFolder  string `json:"draftsFolder"`
+	TrashFolder   string `json:"trashFolder"`
+	ArchiveFolder string `json:"archiveFolder"`
 }
 
 type accountJSON struct {
@@ -100,6 +102,10 @@ func Load(path string) (*Config, error) {
 			SMTPEncryption: withDefaultStr(acct.SMTP.Encryption, "starttls"),
 			Username:       acct.Address,
 			Password:       password,
+			SentFolder:     raw.Defaults.SentFolder,
+			DraftsFolder:   raw.Defaults.DraftsFolder,
+			TrashFolder:    raw.Defaults.TrashFolder,
+			ArchiveFolder:  raw.Defaults.ArchiveFolder,
 		})
 		if acct.Default && cfg.defaultAccount == -1 {
 			cfg.defaultAccount = len(cfg.Accounts) - 1
@@ -241,7 +247,9 @@ func TemplateJSON() string {
     "peekOnRead": false,
     "saveToSent": true,
     "sentFolder": "",
-    "draftsFolder": ""
+    "draftsFolder": "",
+    "trashFolder": "",
+    "archiveFolder": ""
   },
   "accounts": [
     {

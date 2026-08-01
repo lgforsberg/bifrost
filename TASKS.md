@@ -81,9 +81,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NEXT
 
-- **T-010** Wire the `sentFolder`/`draftsFolder` config options into special-folder resolution
-  or delete them: they are parsed, documented in the README, and never read anywhere.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/config/config.go:17`
 - **T-013** Integration test suite. The two verified critical bugs would both have been caught
   here; `imap.go` (the largest file) is essentially untested and the command layer is at 0%.
   T-006 seeded an in-process SMTP server (`mail/send_smtp_test.go`) to build on.
@@ -175,6 +172,12 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-010** The special folder overrides are wired in rather than deleted, and `trashFolder` and
+  `archiveFolder` join them now that `delete` and `archive` resolve those folders too. An
+  override beats the server's attribute; existence is the caller's problem, so a typo surfaces
+  as a named failure rather than a silent fallback.
+  ↳ done 2026-08-01 · evidence: `TestLoad_SpecialFolderOverridesReachTheAccount` fails on the old
+  code, where `Load` parsed both fields and then dropped them building the account. v1.9.0
 - **T-035** `draft delete` moves to Trash like `delete`, `--permanent` expunges. The removal
   `draft send` performs stays permanent, since Sent already holds the copy.
   ↳ done 2026-08-01 · evidence: the command parsed no flags at all before, so
