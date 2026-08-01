@@ -3,7 +3,7 @@
 **This file is the single source of truth for what we are working on.** If a task is not
 here, it is not tracked. If it is here, its phase and metadata are current.
 
-> **Next free ID: `T-031`** · IDs are never reused · last full verification sweep **2026-08-01**
+> **Next free ID: `T-033`** · IDs are never reused · last full verification sweep **2026-08-01**
 
 ## How to use this file
 
@@ -78,15 +78,16 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NOW
 
-- **T-002** Fix the infinite loop in `ParseMessage`: a persistent non-EOF error from `NextPart`
-  currently spins forever, so one malformed email wedges `read`/`thread`/`draft send`
-  permanently. Bail on repeated errors; add the truncated-multipart regression test.
-  Verified by test on 2026-08-01.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/mime.go:51`
 - **T-003** Close the path traversal in `read --save-attachments`: sender-controlled filenames
   are joined unsanitized, so `../../` escapes the target directory. `filepath.Base` plus a
   post-clean containment check, with tests for traversal and absolute-path names.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/read.go:55`
+- **T-031** Register the charset decoders: with only UTF-8 and US-ASCII handled, a single-part
+  `iso-8859-1` or `windows-1252` message makes `read` fail with "unhandled charset" and a
+  multipart one silently returns an empty body, so ordinary legacy mail is unreadable. Importing
+  `_ "github.com/emersion/go-message/charset"` registers them; confirm the `go.mod` cost.
+  Verified by probe on 2026-08-01.
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/mime.go:14`
 - **T-004** Add real timeouts and cancellation to the network layer. The three timeout consts
   in `imap.go` are dead code and every `ctx` parameter is ignored, so a stalled server hangs
   bifrost forever and Ctrl-C is a no-op.
@@ -173,6 +174,11 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   distant thread members), envelope-only discovery instead of full-body fetches, and
   `slices.SortFunc` over the hand-rolled insertion sort.
   ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/imap.go:409`
+- **T-032** Fall back to raw bytes instead of dropping a part the reader cannot fully decode.
+  A body read that fails part way discards the readable prefix (a truncated message reads as
+  empty), and a part with an unhandled `Content-Transfer-Encoding` is skipped outright. Decide
+  separately whether a partial attachment should be surfaced or withheld as a corrupt file.
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/mime.go:70`
 - **T-026** Code hygiene batch: rune-safe `truncate`; `filepath.Ext` over `fileExtension`;
   attachment dedupe increments the wrong map key; unchecked `int64`→`uint32` casts; global flag
   parser silently drops a missing `--account`/`--config` value; version from build info instead
@@ -201,6 +207,12 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-002** A malformed message no longer hangs the parser. Consecutive MIME part failures are
+  capped, so a truncated or broken body returns the headers and recovered parts instead of
+  spinning on a repeated error.
+  ↳ done 2026-08-01 · evidence: `TestParseMessage_MalformedMultipartDoesNotHang` covers three
+  inputs that each hung before, all now returning instantly; removing the bound makes every case
+  fail on the 5s guard; v1.1.2
 - **T-001** Blind-copied recipients are no longer disclosed. `ComposeMessage` omits the `Bcc`
   header, delivery relies on the SMTP envelope, and only the copies filed in Sent and Drafts
   keep the header as the sender's record.
