@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-01
+
+### Added
+
+- `read` reports `bcc` for the messages that carry the header, meaning drafts
+  and Sent copies. `mail.Message` gained the matching field, kept off `Envelope`
+  because a fetch replaces that with the server's version.
+
+### Fixed
+
+- `draft send` no longer drops blind recipients. The stored draft is parsed and
+  re-composed before delivery, but parsing never read the `Bcc` header, so the
+  blind copies were discarded while the command reported success.
+
 ## [1.2.0] - 2026-08-01
 
 ### Added
@@ -94,7 +108,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/lgforsberg/bifrost/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/lgforsberg/bifrost/compare/v1.1.4...v1.2.0
 [1.1.4]: https://github.com/lgforsberg/bifrost/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/lgforsberg/bifrost/compare/v1.1.2...v1.1.3

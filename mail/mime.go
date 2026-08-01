@@ -45,6 +45,13 @@ func ParseMessage(r io.Reader) (*Message, error) {
 			msg.To = append(msg.To, Address{Name: a.Name, Address: a.Address})
 		}
 	}
+	// Only present on drafts and Sent copies, which are composed with it so the
+	// blind recipients survive a save-and-send round trip.
+	if bcc, err := h.AddressList("Bcc"); err == nil {
+		for _, a := range bcc {
+			msg.Bcc = append(msg.Bcc, Address{Name: a.Name, Address: a.Address})
+		}
+	}
 	if cc, err := h.AddressList("Cc"); err == nil {
 		for _, a := range cc {
 			msg.Cc = append(msg.Cc, Address{Name: a.Name, Address: a.Address})

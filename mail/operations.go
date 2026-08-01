@@ -173,6 +173,7 @@ func SendDraft(ctx context.Context, account AccountConfig, imap *IMAPClient, uid
 		From:        msg.From,
 		To:          msg.To,
 		Cc:          msg.Cc,
+		Bcc:         msg.Bcc,
 		Subject:     msg.Subject,
 		TextBody:    msg.TextBody,
 		HTMLBody:    msg.HTMLBody,

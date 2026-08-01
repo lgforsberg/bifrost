@@ -78,10 +78,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NOW
 
-- **T-005** Fix `draft send` silently dropping Bcc recipients: `ParseMessage` never extracts
-  `Bcc`, so the recompose loses them while reporting success. Unblocked by T-001, which settled
-  that drafts keep the `Bcc` header on the server, so the fix is to read it back on parse.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/mime.go:36`
 
 ## NEXT
 
@@ -196,6 +192,12 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-005** `draft send` keeps its blind recipients. `ParseMessage` now reads the `Bcc` header
+  back off the stored draft, which T-001 had already made sure was written, and `read` reports
+  it for the copies that carry it.
+  ↳ done 2026-08-01 · evidence: `TestDraftRoundTrip_PreservesBcc` walks save, parse and
+  re-compose, asserting the blind recipient reaches the SMTP envelope and never the delivered
+  bytes; it reports an empty Bcc without the parse change; v1.3.0
 - **T-004** The network layer has real timeouts and honours cancellation. Both clients now run
   over a connection carrying a 60s idle deadline on every read and write, and cancelling the
   context drops that connection, which is the only way to interrupt commands that take no

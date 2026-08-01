@@ -1,10 +1,61 @@
 package mail
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 	"time"
 )
+
+// Walks the draft lifecycle without a server: SaveDraft stores a copy that
+// keeps the Bcc header, SendDraft parses that copy back and re-composes it.
+// The blind recipients have to survive the round trip into the SMTP envelope
+// while still never appearing in the delivered bytes.
+func TestDraftRoundTrip_PreservesBcc(t *testing.T) {
+	draft := SendOptions{
+		From:     Address{Address: "alice@example.com"},
+		To:       []Address{{Address: "bob@example.com"}},
+		Cc:       []Address{{Address: "carol@example.com"}},
+		Bcc:      []Address{{Address: "dave@example.com"}},
+		Subject:  "Draft with a blind copy",
+		TextBody: "Body",
+	}
+
+	stored, err := composeMessage(draft, true)
+	if err != nil {
+		t.Fatalf("composing the stored draft: %v", err)
+	}
+
+	parsed, err := ParseMessage(bytes.NewReader(stored))
+	if err != nil {
+		t.Fatalf("parsing the stored draft: %v", err)
+	}
+	if len(parsed.Bcc) != 1 || parsed.Bcc[0].Address != "dave@example.com" {
+		t.Fatalf("Bcc = %+v, want the blind recipient read back off the draft", parsed.Bcc)
+	}
+
+	resend := SendOptions{
+		From:     parsed.From,
+		To:       parsed.To,
+		Cc:       parsed.Cc,
+		Bcc:      parsed.Bcc,
+		Subject:  parsed.Subject,
+		TextBody: parsed.TextBody,
+	}
+
+	recipients := collectRecipients(resend)
+	if !containsStr(recipients, "dave@example.com") {
+		t.Errorf("blind recipient missing from the SMTP envelope: %v", recipients)
+	}
+
+	delivered, err := ComposeMessage(resend)
+	if err != nil {
+		t.Fatalf("composing the delivered message: %v", err)
+	}
+	if strings.Contains(string(delivered), "dave@example.com") {
+		t.Error("blind recipient disclosed in the delivered message")
+	}
+}
 
 func TestBuildReply_Basic(t *testing.T) {
 	acct := AccountConfig{

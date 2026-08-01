@@ -67,6 +67,11 @@ func Read(g *cmdutil.GlobalFlags, args []string) error {
 	if len(msg.Cc) > 0 {
 		fmt.Printf("Cc:      %s\n", formatAddresses(msg.Cc))
 	}
+	// Only ever set on a draft or a Sent copy, where the sender needs to see
+	// who was blind-copied.
+	if len(msg.Bcc) > 0 {
+		fmt.Printf("Bcc:     %s\n", formatAddresses(msg.Bcc))
+	}
 	fmt.Printf("Date:    %s\n", msg.Date.Format("Mon, 02 Jan 2006 15:04:05 -0700"))
 	fmt.Printf("Subject: %s\n", msg.Subject)
 	if len(msg.Attachments) > 0 {

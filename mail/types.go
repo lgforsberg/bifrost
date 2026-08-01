@@ -51,6 +51,10 @@ type Envelope struct {
 
 type Message struct {
 	Envelope
+	// Bcc sits here rather than on Envelope because it is only ever known from
+	// the message source, and only on copies we wrote ourselves: FetchMessage
+	// replaces the embedded Envelope with the server's own.
+	Bcc         []Address    `json:"bcc,omitempty"`
 	TextBody    string       `json:"textBody"`
 	HTMLBody    string       `json:"htmlBody,omitempty"`
 	Attachments []Attachment `json:"attachments,omitempty"`
