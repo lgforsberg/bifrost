@@ -89,11 +89,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   - [ ] golden-file tests for each command's JSON output and error codes
   - [x] `internal/commands` has a test file at all (T-036 added the first four)
   ↳ since 2026-08-01 · pushed 0 · size L · verified 2026-08-01 · ref `mail/imap.go`
-- **T-014** Docs accuracy pass: README claims per-account defaults that do not exist and does not
-  mention the go-imap beta dependency. Fix the claims or implement them (per-account defaults may
-  become its own task).
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `README.md`
-
 ## LATER
 
 - **T-034** `draft send` ignores the `saveToSent` default and has no `--no-save`, so it always
@@ -173,6 +168,12 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-014** Docs match the code. The per-account claim was made true rather than deleted: the
+  folder overrides now sit on an account as well as in defaults, since T-010 had just made four
+  provider-specific settings global across every account. Dependencies documented, go-imap's
+  beta status called out, `config init`'s flag exception noted.
+  ↳ done 2026-08-01 · evidence: `TestLoad_AccountOverridesBeatDefaults` covers an account
+  overriding one folder and inheriting the rest. v1.10.0
 - **T-036** `config init` honours `--config` after the command and rejects arguments it does not
   understand. Found by running the documented invocation while verifying T-010.
   ↳ done 2026-08-01 · evidence: the documented form wrote to `~/.bifrost/config.json` and said

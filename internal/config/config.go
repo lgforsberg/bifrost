@@ -28,6 +28,14 @@ type accountJSON struct {
 	SMTP         serverJSON `json:"smtp"`
 	Password     string     `json:"password"`
 	PasswordFile string     `json:"passwordFile"`
+
+	// Folder overrides, which fall back to the ones in defaults. They belong
+	// here as well because two accounts on different providers rarely name
+	// their folders the same way.
+	SentFolder    string `json:"sentFolder"`
+	DraftsFolder  string `json:"draftsFolder"`
+	TrashFolder   string `json:"trashFolder"`
+	ArchiveFolder string `json:"archiveFolder"`
 }
 
 type serverJSON struct {
@@ -102,10 +110,10 @@ func Load(path string) (*Config, error) {
 			SMTPEncryption: withDefaultStr(acct.SMTP.Encryption, "starttls"),
 			Username:       acct.Address,
 			Password:       password,
-			SentFolder:     raw.Defaults.SentFolder,
-			DraftsFolder:   raw.Defaults.DraftsFolder,
-			TrashFolder:    raw.Defaults.TrashFolder,
-			ArchiveFolder:  raw.Defaults.ArchiveFolder,
+			SentFolder:     withDefaultStr(acct.SentFolder, raw.Defaults.SentFolder),
+			DraftsFolder:   withDefaultStr(acct.DraftsFolder, raw.Defaults.DraftsFolder),
+			TrashFolder:    withDefaultStr(acct.TrashFolder, raw.Defaults.TrashFolder),
+			ArchiveFolder:  withDefaultStr(acct.ArchiveFolder, raw.Defaults.ArchiveFolder),
 		})
 		if acct.Default && cfg.defaultAccount == -1 {
 			cfg.defaultAccount = len(cfg.Accounts) - 1
@@ -259,7 +267,11 @@ func TemplateJSON() string {
       "imap": { "host": "imap.example.com", "port": 993, "encryption": "tls" },
       "smtp": { "host": "smtp.example.com", "port": 587, "encryption": "starttls" },
       "password": "",
-      "passwordFile": "~/.bifrost/pass-you@example.com"
+      "passwordFile": "~/.bifrost/pass-you@example.com",
+      "sentFolder": "",
+      "draftsFolder": "",
+      "trashFolder": "",
+      "archiveFolder": ""
     }
   ]
 }

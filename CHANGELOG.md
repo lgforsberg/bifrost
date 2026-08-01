@@ -6,6 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-08-01
+
+### Added
+
+- The four folder overrides can be set per account, not only in `defaults`. An
+  account's own value wins and anything it omits falls back to the default,
+  which matters when two accounts are on providers that name folders
+  differently. The README had claimed per-account defaults since 1.1.0; this
+  makes the claim true for the settings where it actually matters.
+
+### Fixed
+
+- README documents the dependencies, including that `go-imap/v2` is pinned at a
+  beta release deliberately.
+- README notes that `config init` accepts `--config` after the command, the one
+  exception to global flags coming first.
+
 ## [1.9.1] - 2026-08-01
 
 ### Fixed
@@ -240,7 +257,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.9.1...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.10.0...HEAD
+[1.10.0]: https://github.com/lgforsberg/bifrost/compare/v1.9.1...v1.10.0
 [1.9.1]: https://github.com/lgforsberg/bifrost/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/lgforsberg/bifrost/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/lgforsberg/bifrost/compare/v1.7.0...v1.8.0

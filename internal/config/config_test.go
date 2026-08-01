@@ -134,6 +134,47 @@ func TestLoad_SpecialFolderOverridesReachTheAccount(t *testing.T) {
 	}
 }
 
+// Two accounts on different providers rarely agree on folder names, so an
+// account's own override has to beat the shared default.
+func TestLoad_AccountOverridesBeatDefaults(t *testing.T) {
+	path := writeConfig(t, `{
+		"defaults": {
+			"archiveFolder": "Arkiv",
+			"trashFolder": "Papperskorg"
+		},
+		"accounts": [
+			{
+				"address": "se@example.com",
+				"imap": {"host": "imap.example.com"},
+				"smtp": {"host": "smtp.example.com"},
+				"password": "secret"
+			},
+			{
+				"address": "us@example.net",
+				"archiveFolder": "Archive",
+				"imap": {"host": "imap.example.net"},
+				"smtp": {"host": "smtp.example.net"},
+				"password": "secret"
+			}
+		]
+	}`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	if got := cfg.Accounts[0].SpecialFolderOverride("\\Archive"); got != "Arkiv" {
+		t.Errorf("first account archive = %q, want the default Arkiv", got)
+	}
+	if got := cfg.Accounts[1].SpecialFolderOverride("\\Archive"); got != "Archive" {
+		t.Errorf("second account archive = %q, want its own Archive", got)
+	}
+	// An account that overrides one folder still inherits the rest.
+	if got := cfg.Accounts[1].SpecialFolderOverride("\\Trash"); got != "Papperskorg" {
+		t.Errorf("second account trash = %q, want the inherited Papperskorg", got)
+	}
+}
+
 func TestLoad_NoOverridesLeavesResolutionToTheServer(t *testing.T) {
 	path := writeConfig(t, `{
 		"accounts": [{

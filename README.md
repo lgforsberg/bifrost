@@ -18,7 +18,7 @@ echo "On it." | bifrost reply 42
 - **SMTP** — RFC 2822 composition, MIME multipart with attachments, plus-address (`user+tag@`) envelope handling
 - **Threading** — reconstruct conversations across folders via `In-Reply-To`/`References`; reply/forward headers compatible with Gmail and Apple Mail
 - **Drafts** — save/list/send/delete, with an optional approval keyword workflow
-- **Multi-account** — flexible account matching, per-account defaults
+- **Multi-account** — flexible account matching, per-account folder overrides
 - **JSON everywhere** — machine-readable output and structured error codes for scripting and automation
 - **Reusable library** — the same engine that powers the CLI is importable as `github.com/lgforsberg/bifrost/mail`
 
@@ -74,7 +74,11 @@ Run `bifrost config init` to generate a template.
       "imap": { "host": "imap.example.com", "port": 993, "encryption": "tls" },
       "smtp": { "host": "smtp.example.com", "port": 587, "encryption": "starttls" },
       "password": "",
-      "passwordFile": "~/.bifrost/pass-you@example.com"
+      "passwordFile": "~/.bifrost/pass-you@example.com",
+      "sentFolder": "",
+      "draftsFolder": "",
+      "trashFolder": "",
+      "archiveFolder": ""
     }
   ]
 }
@@ -109,14 +113,20 @@ Leave the folder overrides empty unless you need them. Bifrost otherwise asks th
 | `smtp.encryption` | No | `starttls` (default), `tls`, or `none` |
 | `password` | * | Inline password |
 | `passwordFile` | * | Path to a file containing the password (tilde-expanded) |
+| `sentFolder` | No | Override this account's Sent folder |
+| `draftsFolder` | No | Override this account's Drafts folder |
+| `trashFolder` | No | Override this account's Trash folder |
+| `archiveFolder` | No | Override this account's Archive folder |
 
 \* One of `password` or `passwordFile` is required. A `passwordFile` keeps the secret out of the config.
+
+The four folder overrides can be set per account as well as in `defaults`. An account's own value wins, and anything it leaves out falls back to the default, which matters when two accounts are on providers that name their folders differently.
 
 ## CLI reference
 
 ### Global options
 
-Global flags **must** appear before the command name:
+Global flags **must** appear before the command name (`config init` also accepts `--config` after it):
 
 ```
 bifrost [global options] <command> [command options] [arguments]
@@ -425,6 +435,18 @@ bifrost/
 ├── mail/            public IMAP/SMTP/MIME library (package mail)
 └── internal/        CLI internals (commands, config, helpers, output)
 ```
+
+## Dependencies
+
+Bifrost builds on the `emersion` mail libraries (`go-imap`, `go-smtp`,
+`go-message`, `go-sasl`), plus `google/uuid` and `golang.org/x/term`. Nothing
+else, and no C dependencies.
+
+Note that `go-imap/v2` is pinned at a **beta** release. It is the only
+maintained IMAP v2 client for Go and the API has been stable in practice, but
+the version is deliberate rather than incidental: expect churn if you vendor
+it, and see [`TASKS.md`](TASKS.md) T-028 for moving off the beta once upstream
+tags a stable v2.
 
 ## Development
 
