@@ -201,11 +201,18 @@ func draftSend(g *cmdutil.GlobalFlags, args []string) error {
 }
 
 func draftDelete(g *cmdutil.GlobalFlags, args []string) error {
-	if len(args) < 1 {
+	fs := flag.NewFlagSet("draft delete", flag.ContinueOnError)
+	permanent := fs.Bool("permanent", false, "expunge immediately instead of moving to Trash")
+	args = helpers.ReorderArgs(args, map[string]bool{"permanent": true})
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("usage: %w", err)
+	}
+
+	if fs.NArg() < 1 {
 		return fmt.Errorf("usage: draft delete <uid>")
 	}
 
-	uids, err := helpers.ParseUIDs(args[:1])
+	uids, err := helpers.ParseUIDs(fs.Args()[:1])
 	if err != nil {
 		return err
 	}
@@ -221,14 +228,32 @@ func draftDelete(g *cmdutil.GlobalFlags, args []string) error {
 		draftsFolder = "Drafts"
 	}
 
-	if err := client.DeleteMessage(g.Ctx, draftsFolder, uids[0]); err != nil {
+	// Same bargain as the delete command: an unsent draft is work, and losing
+	// it to a mistyped UID should be recoverable.
+	var movedTo string
+	if *permanent {
+		err = client.DeleteMessage(g.Ctx, draftsFolder, uids[0])
+	} else {
+		movedTo, err = mail.TrashMessages(g.Ctx, client, draftsFolder, uids[:1])
+	}
+	if err != nil {
 		return err
 	}
 
+	gone := movedTo == ""
+
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, map[string]string{"status": "deleted"})
+		result := map[string]any{"status": "deleted", "permanent": gone}
+		if !gone {
+			result["movedTo"] = movedTo
+		}
+		return output.PrintJSON(os.Stdout, result)
+	}
+
+	if gone {
+		fmt.Println("Draft permanently deleted.")
 	} else {
-		fmt.Println("Draft deleted.")
+		fmt.Printf("Draft moved to %s.\n", movedTo)
 	}
 	return nil
 }

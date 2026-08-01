@@ -81,10 +81,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NEXT
 
-- **T-035** `draft delete` still expunges, so the two commands named delete now mean different
-  things. Either give it the same `--permanent` treatment as T-008 or say why a draft is
-  different. Note `SendDraft` removing a draft it just delivered should stay permanent.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/draft.go:draftDelete`
 - **T-010** Wire the `sentFolder`/`draftsFolder` config options into special-folder resolution
   or delete them: they are parsed, documented in the README, and never read anywhere.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/config/config.go:17`
@@ -179,6 +175,11 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-035** `draft delete` moves to Trash like `delete`, `--permanent` expunges. The removal
+  `draft send` performs stays permanent, since Sent already holds the copy.
+  ↳ done 2026-08-01 · evidence: the command parsed no flags at all before, so
+  `draft delete --permanent 42` read the flag as the UID; it now uses a flag set with the bool
+  declared in the reorder map. v1.8.0
 - **T-011** Replies follow `Reply-To`. Fixed a duplicate-recipient bug in `--all` found while
   reworking the same addressing code.
   ↳ done 2026-08-01 · evidence: `TestBuildReply_HonorsReplyTo` covers the mailing-list case that

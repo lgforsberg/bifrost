@@ -320,10 +320,12 @@ bifrost draft save [--to ADDR...] [--cc ADDR...] [--bcc ADDR...] [--subject TEXT
                    [--from ADDR] [--approval] [--body TEXT | --body-file PATH] [--attach PATH...]
 bifrost draft list [--limit N] [--offset N]
 bifrost draft send <uid>
-bifrost draft delete <uid>
+bifrost draft delete [--permanent] <uid>
 ```
 
 `save` returns the server-assigned UID (via UIDPLUS). `--approval` tags the draft with the `$PendingApproval` IMAP keyword.
+
+`draft delete` moves the draft to Trash, matching `delete`; `--permanent` expunges it. A draft removed by `draft send` is expunged either way, since a copy of it is already in Sent.
 
 #### `config` — Configuration management
 

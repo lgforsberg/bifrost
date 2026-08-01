@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-08-01
+
+### Changed
+
+- `draft delete` moves the draft to Trash, with `--permanent` to expunge, so
+  the two commands named delete mean the same thing. A draft removed by
+  `draft send` is still expunged, since a copy of it is already in Sent. The
+  JSON result reports `permanent` and `movedTo`.
+- `draft delete` now parses flags, so `draft delete --permanent 42` works
+  rather than reading the flag as a UID.
+
 ## [1.7.0] - 2026-08-01
 
 ### Fixed
@@ -203,7 +214,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/lgforsberg/bifrost/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/lgforsberg/bifrost/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/lgforsberg/bifrost/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/lgforsberg/bifrost/compare/v1.4.2...v1.5.0
