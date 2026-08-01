@@ -6,6 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-08-01
+
+### Fixed
+
+- `archive`, `delete` and `draft save` create a configured folder that does not
+  exist yet instead of failing with `No such mailbox`. Only the fallback path
+  created folders, so setting any of the overrides added in 1.9.0 broke these
+  commands on a server that did not already have the folder.
+
+### Added
+
+- Integration tests against an in-process IMAP server, covering append and
+  fetch, trash, archive, folder operations and their error codes, and, together
+  with the SMTP test server, the full send and draft round trips. Coverage of
+  `package mail` goes from 42.9% to 69.5%, and the first run of the harness is
+  what found the bug above.
+
 ## [1.10.0] - 2026-08-01
 
 ### Added
@@ -257,7 +274,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.10.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.10.1...HEAD
+[1.10.1]: https://github.com/lgforsberg/bifrost/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/lgforsberg/bifrost/compare/v1.9.1...v1.10.0
 [1.9.1]: https://github.com/lgforsberg/bifrost/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/lgforsberg/bifrost/compare/v1.8.0...v1.9.0

@@ -3,7 +3,7 @@
 **This file is the single source of truth for what we are working on.** If a task is not
 here, it is not tracked. If it is here, its phase and metadata are current.
 
-> **Next free ID: `T-037`** · IDs are never reused · last full verification sweep **2026-08-01**
+> **Next free ID: `T-038`** · IDs are never reused · last full verification sweep **2026-08-01**
 
 ## How to use this file
 
@@ -84,11 +84,20 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 - **T-013** Integration test suite. The two verified critical bugs would both have been caught
   here; `imap.go` (the largest file) is essentially untested and the command layer is at 0%.
   T-006 seeded an in-process SMTP server (`mail/send_smtp_test.go`) to build on.
-  - [ ] fake/scripted IMAP server covering FetchMessage, DeleteMessages, Search, special folders
-  - [ ] the T-006 warning paths: a Sent append that fails, a draft that will not delete
+  - [x] in-process IMAP server. No need to script one: go-imap ships `imapmemserver`, which
+        turned this from an L into an afternoon (`mail/imapserver_test.go`)
+  - [x] append and fetch, trash, archive, folder create/rename/delete and their error codes
+  - [x] the T-006 Sent append warning, and a save-then-send draft round trip across both
+        in-process servers
+  - [ ] Search and FetchThread against the server
+  - [ ] a draft that will not delete. `imapmemserver` cannot refuse on demand, so this needs a
+        wrapper session that fails a chosen command
+  - [ ] special-use attributes over the wire. `imapmemserver` never sets them, so `ListFolders`
+        reading them is still only covered by the pure `matchSpecialFolder` test
   - [ ] golden-file tests for each command's JSON output and error codes
   - [x] `internal/commands` has a test file at all (T-036 added the first four)
-  ↳ since 2026-08-01 · pushed 0 · size L · verified 2026-08-01 · ref `mail/imap.go`
+  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/imapserver_test.go`
+  ↳ took `mail` from 42.9% to 69.5%, and caught T-037 on the first run
 ## LATER
 
 - **T-034** `draft send` ignores the `saveToSent` default and has no `--no-save`, so it always
@@ -168,6 +177,13 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-037** `archive`, `delete` and `draft save` create a configured folder that is not there
+  yet. Only the fallback path called `EnsureFolder`, so the overrides added in T-010 broke all
+  three on any server that did not already have the folder. `resolveOrCreate` in
+  `mail/operations.go` is now the single answer to "which folder, and does it exist".
+  ↳ done 2026-08-01 · evidence: found by the first run of T-013's harness, four hours after
+  T-010 shipped the bug. `TestArchive_UsesTheConfiguredFolder` fails with
+  `NO [TRYCREATE] No such mailbox` on the old code. v1.10.1
 - **T-014** Docs match the code. The per-account claim was made true rather than deleted: the
   folder overrides now sit on an account as well as in defaults, since T-010 had just made four
   provider-specific settings global across every account. Dependencies documented, go-imap's

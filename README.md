@@ -96,7 +96,9 @@ Run `bifrost config init` to generate a template.
 | `trashFolder` | `""` | Override Trash folder name (auto-detected via IMAP if empty) |
 | `archiveFolder` | `""` | Override Archive folder name (auto-detected via IMAP if empty) |
 
-Leave the folder overrides empty unless you need them. Bifrost otherwise asks the server which folder is which, via the IMAP special-use attributes, which is correct on localized and renamed accounts too. An override wins over the server's answer, and the folder is used as given: if it does not exist, the command that needs it says so rather than guessing.
+Leave the folder overrides empty unless you need them. Bifrost otherwise asks the server which folder is which, via the IMAP special-use attributes, which is correct on localized and renamed accounts too.
+
+An override wins over the server's answer. Commands that file mail somewhere (`archive`, `delete`, `draft save`) create the folder if it is missing, just as they do with the conventional name, so an account can be configured before the folders exist. Filing the copy in Sent is the exception: it creates nothing, and a missing folder is reported as a warning on an otherwise successful send.
 
 **Account fields:**
 

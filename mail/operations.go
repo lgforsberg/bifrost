@@ -149,14 +149,30 @@ func BuildForward(account AccountConfig, original *Message, to []Address, body s
 // nothing does this fall back to a folder literally named Archive, creating it
 // if needed. Batch UIDs.
 func Archive(ctx context.Context, imap *IMAPClient, folder string, uids []uint32) error {
-	target, err := imap.FindSpecialFolder(ctx, "\\Archive")
+	target, err := resolveOrCreate(ctx, imap, "\\Archive", "Archive")
 	if err != nil {
-		target = "Archive"
-		if err := imap.EnsureFolder(ctx, target); err != nil {
-			return fmt.Errorf("ensuring Archive folder: %w", err)
-		}
+		return err
 	}
 	return imap.MoveMessages(ctx, uids, folder, target)
+}
+
+// resolveOrCreate names the folder for a special-use attribute and makes sure
+// it is there. A name the server listed exists by definition; a configured
+// override or a fallback guess may not, and the commands that use this create
+// their destination rather than refusing to file anything.
+func resolveOrCreate(ctx context.Context, imap *IMAPClient, attr, fallback string) (string, error) {
+	name := imap.config.SpecialFolderOverride(attr)
+	if name == "" {
+		if resolved, err := imap.FindSpecialFolder(ctx, attr); err == nil {
+			return resolved, nil
+		}
+		name = fallback
+	}
+
+	if err := imap.EnsureFolder(ctx, name); err != nil {
+		return "", fmt.Errorf("ensuring folder %q for %s: %w", name, attr, err)
+	}
+	return name, nil
 }
 
 // TrashMessages moves messages to the server's Trash folder, which is what
@@ -165,12 +181,9 @@ func Archive(ctx context.Context, imap *IMAPClient, folder string, uids []uint32
 // nowhere further to go and are expunged instead, in which case movedTo is
 // empty. Batch UIDs.
 func TrashMessages(ctx context.Context, imap *IMAPClient, folder string, uids []uint32) (movedTo string, err error) {
-	trash, err := imap.FindSpecialFolder(ctx, "\\Trash")
+	trash, err := resolveOrCreate(ctx, imap, "\\Trash", "Trash")
 	if err != nil {
-		trash = "Trash"
-		if err := imap.EnsureFolder(ctx, trash); err != nil {
-			return "", fmt.Errorf("ensuring Trash folder: %w", err)
-		}
+		return "", err
 	}
 
 	if strings.EqualFold(folder, trash) {
@@ -189,12 +202,9 @@ func SaveDraft(ctx context.Context, imap *IMAPClient, opts SendOptions, keywords
 		return 0, fmt.Errorf("composing draft: %w", err)
 	}
 
-	draftsFolder, err := imap.FindSpecialFolder(ctx, "\\Drafts")
+	draftsFolder, err := resolveOrCreate(ctx, imap, "\\Drafts", "Drafts")
 	if err != nil {
-		draftsFolder = "Drafts"
-		if err := imap.EnsureFolder(ctx, draftsFolder); err != nil {
-			return 0, fmt.Errorf("ensuring Drafts folder: %w", err)
-		}
+		return 0, err
 	}
 
 	flags := []string{"\\Draft", "\\Seen"}
