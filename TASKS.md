@@ -3,7 +3,7 @@
 **This file is the single source of truth for what we are working on.** If a task is not
 here, it is not tracked. If it is here, its phase and metadata are current.
 
-> **Next free ID: `T-036`** · IDs are never reused · last full verification sweep **2026-08-01**
+> **Next free ID: `T-037`** · IDs are never reused · last full verification sweep **2026-08-01**
 
 ## How to use this file
 
@@ -87,6 +87,7 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   - [ ] fake/scripted IMAP server covering FetchMessage, DeleteMessages, Search, special folders
   - [ ] the T-006 warning paths: a Sent append that fails, a draft that will not delete
   - [ ] golden-file tests for each command's JSON output and error codes
+  - [x] `internal/commands` has a test file at all (T-036 added the first four)
   ↳ since 2026-08-01 · pushed 0 · size L · verified 2026-08-01 · ref `mail/imap.go`
 - **T-014** Docs accuracy pass: README claims per-account defaults that do not exist and does not
   mention the go-imap beta dependency. Fix the claims or implement them (per-account defaults may
@@ -172,6 +173,11 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-036** `config init` honours `--config` after the command and rejects arguments it does not
+  understand. Found by running the documented invocation while verifying T-010.
+  ↳ done 2026-08-01 · evidence: the documented form wrote to `~/.bifrost/config.json` and said
+  nothing; it refused to overwrite, so nothing was lost. Four tests in `internal/commands`, the
+  package's first, including one pinning the refusal to overwrite. v1.9.1
 - **T-010** The special folder overrides are wired in rather than deleted, and `trashFolder` and
   `archiveFolder` join them now that `delete` and `archive` resolve those folders too. An
   override beats the server's attribute; existence is the caller's problem, so a typo surfaces

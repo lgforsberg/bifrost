@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-08-01
+
+### Fixed
+
+- `config init --config PATH` writes to the given path. The flag was only
+  recognised before the command, so the documented form silently wrote to
+  `~/.bifrost/config.json` instead and said nothing. It refused to overwrite an
+  existing file, so nothing was lost, but the config landed in the wrong place.
+- `config` rejects arguments it does not understand instead of ignoring them.
+
 ## [1.9.0] - 2026-08-01
 
 ### Fixed
@@ -230,7 +240,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.9.1...HEAD
+[1.9.1]: https://github.com/lgforsberg/bifrost/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/lgforsberg/bifrost/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/lgforsberg/bifrost/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/lgforsberg/bifrost/compare/v1.6.0...v1.7.0

@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,7 +18,7 @@ func Config(g *cmdutil.GlobalFlags, args []string) error {
 
 	switch args[0] {
 	case "init":
-		return configInit(g)
+		return configInit(g, args[1:])
 	case "help", "--help", "-h":
 		return fmt.Errorf("usage: config <init>")
 	default:
@@ -25,10 +26,25 @@ func Config(g *cmdutil.GlobalFlags, args []string) error {
 	}
 }
 
-func configInit(g *cmdutil.GlobalFlags) error {
+func configInit(g *cmdutil.GlobalFlags, args []string) error {
+	fs := flag.NewFlagSet("config init", flag.ContinueOnError)
+	// Accepted here as well as globally. Writing a config somewhere the caller
+	// did not ask for is worse than taking the same flag in two places, and
+	// after the command is where people reach for it.
+	pathFlag := fs.String("config", "", "path to write the config to")
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("usage: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return fmt.Errorf("usage: config init takes no arguments, got %q", fs.Arg(0))
+	}
+
 	cfgPath := config.DefaultConfigPath()
 	if g.ConfigPath != "" {
 		cfgPath = g.ConfigPath
+	}
+	if *pathFlag != "" {
+		cfgPath = *pathFlag
 	}
 
 	if _, err := os.Stat(cfgPath); err == nil {
