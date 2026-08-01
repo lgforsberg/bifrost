@@ -84,29 +84,29 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 - **T-006** Surface save-to-Sent and draft-cleanup failures instead of Debug-logging them:
   `send`/`reply`/`forward`/`draft send` currently report clean success when the Sent copy was
   never written. Warn on stderr and add a field to the JSON result.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/operations.go:25`
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/operations.go:appendToSent`
 - **T-007** Replace substring error classification with typed errors: `errors.As` on
   `*smtp.SMTPError` codes, IMAP response codes for `ALREADYEXISTS`/`NONEXISTENT`/mailbox
   checks. Today any error containing "auth" maps to `AUTH_FAILED`.
-  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/smtp.go:44`
+  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/smtp.go:classifySMTPError`
 - **T-008** 🧭 Give `delete` trash semantics: move to `\Trash` by default, expunge only with
   `--permanent`. Decision needed: change the default of a shipped command, or add the safe
   path behind a flag only.
-  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/imap.go:195`
+  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/imap.go:DeleteMessages`
 - **T-009** `Archive` should resolve the `\Archive` special-use attribute with a fallback list
   (like Sent/Drafts/Trash already do) instead of hardcoding a literal `"Archive"` folder;
   breaks on Gmail and localized folder names today.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/operations.go:96`
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/operations.go:Archive`
 - **T-010** Wire the `sentFolder`/`draftsFolder` config options into special-folder resolution
   or delete them: they are parsed, documented in the README, and never read anywhere.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/config/config.go:17`
 - **T-011** Parse `Reply-To` in `ParseMessage` and honor it in `BuildReply`; replies to mailing
   lists and send-as setups currently go to the raw `From` address.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/mime.go:13`
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/mime.go:ParseMessage`
 - **T-012** 🧭 Make `read` exclude attachment bytes from JSON by default with an opt-in flag;
   today a single message with attachments base64-inflates agent context. Breaking output
   change to a shipped command, needs a call.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/read.go:73`
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/read.go:Read`
 - **T-013** Integration test suite. The two verified critical bugs would both have been caught
   here; `imap.go` (the largest file) is essentially untested and the command layer is at 0%.
   - [ ] fake/scripted IMAP server covering FetchMessage, DeleteMessages, Search, special folders
@@ -124,7 +124,7 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   link is fine (the deadline is per read, not total) but an agent may want to fail faster, and
   T-029's IDLE support would need the read deadline lifted entirely. A `--timeout` global flag
   or a config default, threaded into `dial`.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/dial.go:12`
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/dial.go:dialTimeout`
 - **T-015** `flag`/`unflag` commands to set and clear `\Flagged`; search can already filter on
   it but nothing can set it, and star-as-todo is a core agent pattern.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/markread.go`
@@ -148,7 +148,7 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `internal/commands/search.go`
 - **T-022** 🧭 Pagination metadata in `inbox`/`search` JSON (folder total is already returned by
   SELECT and discarded). Changes the output shape from a bare array, needs a call on format.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/imap.go:98`
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/imap.go:ListEnvelopes`
 - **T-023** `draft update <uid>`: append the revised draft and delete the old one in a single
   command so agent revision loops are not save-new-then-delete-old by hand.
   ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `internal/commands/draft.go`
@@ -158,12 +158,12 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 - **T-025** `FetchThread` rework: iterative reference expansion (current single hop misses
   distant thread members), envelope-only discovery instead of full-body fetches, and
   `slices.SortFunc` over the hand-rolled insertion sort.
-  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/imap.go:409`
+  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/imap.go:FetchThread`
 - **T-032** Fall back to raw bytes instead of dropping a part the reader cannot fully decode.
   A body read that fails part way discards the readable prefix (a truncated message reads as
   empty), and a part with an unhandled `Content-Transfer-Encoding` is skipped outright. Decide
   separately whether a partial attachment should be surfaced or withheld as a corrupt file.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/mime.go:70`
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/mime.go:ParseMessage part walk`
 - **T-026** Code hygiene batch: rune-safe `truncate`; `filepath.Ext` over `fileExtension`;
   unchecked `int64`→`uint32` casts; global flag parser silently drops a missing
   `--account`/`--config` value; version from build info instead of a hand-maintained const;
@@ -175,7 +175,7 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 - **T-027** 🧭 OAuth2 (XOAUTH2/OAUTHBEARER) for IMAP and SMTP; Gmail and Microsoft 365 have
   retired basic auth, so PLAIN-only locks out the two biggest providers. Gate: decide the token
   acquisition model first (external helper command in config vs built-in refresh flow).
-  ↳ since 2026-08-01 · pushed 0 · size L · verified 2026-08-01 · ref `mail/imap.go:54`
+  ↳ since 2026-08-01 · pushed 0 · size L · verified 2026-08-01 · ref `mail/imap.go:Connect`
 - **T-028** 👤 Move off `go-imap v2.0.0-beta.8` when upstream ships a stable v2; until then,
   pin deliberately and note the beta status in the README (covered by T-014).
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `go.mod`
