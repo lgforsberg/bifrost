@@ -91,10 +91,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 - **T-011** Parse `Reply-To` in `ParseMessage` and honor it in `BuildReply`; replies to mailing
   lists and send-as setups currently go to the raw `From` address.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/mime.go:ParseMessage`
-- **T-012** 🧭 Make `read` exclude attachment bytes from JSON by default with an opt-in flag;
-  today a single message with attachments base64-inflates agent context. Breaking output
-  change to a shipped command, needs a call.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/read.go:Read`
 - **T-013** Integration test suite. The two verified critical bugs would both have been caught
   here; `imap.go` (the largest file) is essentially untested and the command layer is at 0%.
   T-006 seeded an in-process SMTP server (`mail/send_smtp_test.go`) to build on.
@@ -186,6 +182,12 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-012** `read` and `thread` omit attachment bytes from JSON unless `--with-attachment-data`
+  is given. Owner chose opt-in over opt-out. Applied to `thread` as well, where a shared
+  attachment was being repeated once per message in the conversation.
+  ↳ done 2026-08-01 · evidence: `data` is dropped by the existing `omitempty` tag, so filename,
+  contentType and size still come through; `--no-attachments` kept working rather than removed,
+  so nothing passing it breaks. v1.6.0
 - **T-008** `delete` moves to Trash; `--permanent` expunges. Owner chose to change the default
   rather than hide the safe path behind a flag, since an agent working from UIDs had no undo.
   ↳ done 2026-08-01 · evidence: `bifrost delete 42` now reports `movedTo`; deleting from Trash

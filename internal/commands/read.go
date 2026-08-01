@@ -15,9 +15,14 @@ func Read(g *cmdutil.GlobalFlags, args []string) error {
 	fs := flag.NewFlagSet("read", flag.ContinueOnError)
 	folder := fs.String("folder", "INBOX", "folder")
 	peek := fs.Bool("peek", false, "don't mark message as read")
-	noAttachments := fs.Bool("no-attachments", false, "exclude attachment data")
+	withData := fs.Bool("with-attachment-data", false, "include attachment bytes in JSON output")
+	noAttachments := fs.Bool("no-attachments", false, "exclude attachment data (now the default)")
 	saveAttachments := fs.String("save-attachments", "", "save attachments to directory")
-	args = helpers.ReorderArgs(args, map[string]bool{"peek": true, "no-attachments": true})
+	args = helpers.ReorderArgs(args, map[string]bool{
+		"peek":                 true,
+		"no-attachments":       true,
+		"with-attachment-data": true,
+	})
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("usage: %w", err)
 	}
@@ -51,7 +56,11 @@ func Read(g *cmdutil.GlobalFlags, args []string) error {
 		}
 	}
 
-	if *noAttachments {
+	// Attachment bytes are left out unless asked for: base64 makes a single PDF
+	// larger than the message carrying it, which is a poor trade for a reader
+	// that mostly wants to know an attachment is there. Filename, type and size
+	// still come through, and --save-attachments writes the bytes to disk.
+	if !*withData || *noAttachments {
 		for i := range msg.Attachments {
 			msg.Attachments[i].Data = nil
 		}

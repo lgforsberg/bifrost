@@ -191,17 +191,19 @@ JSON output: array of envelope objects.
 #### `read` — Read a message
 
 ```
-bifrost read [--folder FOLDER] [--peek] [--no-attachments] [--save-attachments DIR] <uid>
+bifrost read [--folder FOLDER] [--peek] [--with-attachment-data] [--save-attachments DIR] <uid>
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--folder` | `INBOX` | Folder containing the message |
 | `--peek` | `false` | Don't mark the message as read |
-| `--no-attachments` | `false` | Exclude attachment data from output |
+| `--with-attachment-data` | `false` | Include attachment bytes in JSON output |
 | `--save-attachments` | — | Save attachments to the given directory |
 
 By default `read` marks the message seen. Use `--peek` (or `peekOnRead: true`) to read without side effects.
+
+Attachment bytes are left out of the JSON unless you ask for them: base64 makes a single PDF larger than the message carrying it. Each attachment's `filename`, `contentType` and `size` are always reported, so you can see what is there and then use `--save-attachments` to write the files, or `--with-attachment-data` to inline them. (`--no-attachments` still works and is now redundant.)
 
 `--save-attachments` reduces each sender-supplied filename to a bare file name, so an attachment can never be written outside the given directory. Colliding names are suffixed rather than overwritten. Files are written mode 0600 into a directory created 0700.
 
@@ -226,10 +228,10 @@ At least one search criterion is required.
 #### `thread` — View conversation thread
 
 ```
-bifrost thread [--folders FOLDER1,FOLDER2,...] [--no-attachments] <uid>
+bifrost thread [--folders FOLDER1,FOLDER2,...] [--with-attachment-data] <uid>
 ```
 
-Reconstructs a conversation by following `References`/`In-Reply-To` across the given folders (default `INBOX,Sent`). JSON output is chronological, each message tagged with its `folder`.
+Reconstructs a conversation by following `References`/`In-Reply-To` across the given folders (default `INBOX,Sent`). JSON output is chronological, each message tagged with its `folder`. Attachment bytes are excluded by default, as in `read`.
 
 #### `send` — Compose and send
 

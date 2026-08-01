@@ -14,8 +14,12 @@ import (
 func Thread(g *cmdutil.GlobalFlags, args []string) error {
 	fs := flag.NewFlagSet("thread", flag.ContinueOnError)
 	foldersStr := fs.String("folders", "INBOX,Sent", "comma-separated folders to search across")
-	noAttachments := fs.Bool("no-attachments", false, "exclude attachment data")
-	args = helpers.ReorderArgs(args, map[string]bool{"no-attachments": true})
+	withData := fs.Bool("with-attachment-data", false, "include attachment bytes in JSON output")
+	noAttachments := fs.Bool("no-attachments", false, "exclude attachment data (now the default)")
+	args = helpers.ReorderArgs(args, map[string]bool{
+		"no-attachments":       true,
+		"with-attachment-data": true,
+	})
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("usage: %w", err)
 	}
@@ -46,7 +50,9 @@ func Thread(g *cmdutil.GlobalFlags, args []string) error {
 		return err
 	}
 
-	if *noAttachments {
+	// Excluded by default, as in read, and more so here: a thread multiplies
+	// every attachment by the number of messages carrying it.
+	if !*withData || *noAttachments {
 		for i := range messages {
 			for j := range messages[i].Attachments {
 				messages[i].Attachments[j].Data = nil

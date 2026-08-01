@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-08-01
+
+### Changed
+
+- **`read` and `thread` leave attachment bytes out of the JSON by default.**
+  Base64 makes a single PDF larger than the message carrying it, so one read
+  could fill an agent's context with data it did not ask for. Each attachment's
+  `filename`, `contentType` and `size` are still reported, `--save-attachments`
+  still writes the files, and `--with-attachment-data` restores the bytes.
+  `--no-attachments` still works and is now redundant.
+
 ## [1.5.0] - 2026-08-01
 
 ### Changed
@@ -175,7 +186,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/lgforsberg/bifrost/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/lgforsberg/bifrost/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/lgforsberg/bifrost/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/lgforsberg/bifrost/compare/v1.4.0...v1.4.1
