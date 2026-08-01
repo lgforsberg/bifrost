@@ -3,7 +3,64 @@ package mail
 import (
 	"strings"
 	"testing"
+	"time"
 )
+
+// Every input here made the part walk spin on a repeated error before the
+// retry bound was added. Parts whose body cannot be read are skipped, so only
+// cleanly readable parts show up in the body.
+func TestParseMessage_MalformedMultipartDoesNotHang(t *testing.T) {
+	const headers = "From: alice@example.com\r\n" +
+		"Subject: Broken\r\n" +
+		"Content-Type: multipart/mixed; boundary=xyz\r\n" +
+		"\r\n"
+
+	tests := map[string]struct {
+		raw      string
+		wantBody string
+	}{
+		"truncated mid part": {
+			raw: headers + "--xyz\r\nContent-Type: text/plain\r\n\r\nhello\r\n",
+		},
+		"malformed trailing part header": {
+			raw: headers + "--xyz\r\nContent-Type: text/plain\r\n\r\nhello\r\n" +
+				"--xyz\r\nContent-Type: \x00garbage\r\n",
+			wantBody: "hello",
+		},
+		"no parts at all": {
+			raw: headers + "not a mime part at all\r\n",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			type result struct {
+				msg *Message
+				err error
+			}
+			done := make(chan result, 1)
+			go func() {
+				msg, err := ParseMessage(strings.NewReader(tt.raw))
+				done <- result{msg, err}
+			}()
+
+			select {
+			case got := <-done:
+				if got.err != nil {
+					t.Fatalf("ParseMessage error: %v", got.err)
+				}
+				if got.msg.Subject != "Broken" {
+					t.Errorf("Subject = %q, want headers preserved", got.msg.Subject)
+				}
+				if !strings.Contains(got.msg.TextBody, tt.wantBody) {
+					t.Errorf("TextBody = %q, want it to contain %q", got.msg.TextBody, tt.wantBody)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("ParseMessage did not return: the part walk is spinning on a repeated error")
+			}
+		})
+	}
+}
 
 func TestParseMessage_SimplePlainText(t *testing.T) {
 	raw := "From: alice@example.com\r\n" +

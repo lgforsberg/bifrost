@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-08-01
+
+### Fixed
+
+- A malformed message no longer hangs the client. `ParseMessage` skipped failing
+  MIME parts without any bound, and a truncated or broken body makes the reader
+  report the same failure on every call, so a single received message could stall
+  `read`, `thread`, and `draft send` indefinitely. Consecutive part failures are
+  now capped, and parsing returns the headers and the parts recovered so far.
+
 ## [1.1.1] - 2026-08-01
 
 ### Security
@@ -33,6 +43,7 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/lgforsberg/bifrost/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/lgforsberg/bifrost/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/lgforsberg/bifrost/releases/tag/v1.1.0

@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"errors"
 	"io"
 	"mime"
 	"strings"
@@ -8,8 +9,16 @@ import (
 	"github.com/emersion/go-message/mail"
 )
 
+// maxConsecutiveBadParts bounds how many failing parts in a row the walk will
+// skip. A truncated or malformed body makes NextPart report the same failure
+// on every call without advancing, so an unbounded skip would never terminate.
+const maxConsecutiveBadParts = 10
+
 // ParseMessage reads an RFC 2822 message from r and extracts headers,
 // text/html bodies, and attachments. Pure parsing — no I/O beyond the reader.
+//
+// Parsing is best-effort: a message whose MIME structure breaks part way
+// through yields the headers and the parts read up to that point.
 func ParseMessage(r io.Reader) (*Message, error) {
 	mr, err := mail.CreateReader(r)
 	if err != nil {
@@ -48,15 +57,22 @@ func ParseMessage(r io.Reader) (*Message, error) {
 		msg.References = refs
 	}
 
+	badParts := 0
 	for {
 		p, err := mr.NextPart()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
-			// Gracefully skip malformed parts
+			// Gracefully skip malformed parts, but stop once they stop being
+			// occasional: a broken body repeats one error indefinitely.
+			badParts++
+			if badParts >= maxConsecutiveBadParts {
+				break
+			}
 			continue
 		}
+		badParts = 0
 
 		switch h := p.Header.(type) {
 		case *mail.InlineHeader:
