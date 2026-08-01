@@ -94,6 +94,7 @@ exit codes. If you introduce a new failure category, add the sentinel in
 | `ErrSendRejected` | `SEND_REJECTED` | 1 |
 | `ErrInvalidConfig` | `CONFIG_ERROR` | 2 |
 | (`usage:` prefix) | `USAGE_ERROR` | 2 |
+| (cancelled context) | `INTERRUPTED` | 1 |
 
 ## Testing against a real server
 

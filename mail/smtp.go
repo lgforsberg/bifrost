@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
+	"strconv"
 	"strings"
 
 	"github.com/emersion/go-sasl"
@@ -15,7 +17,8 @@ import (
 // The from parameter is the envelope sender (MAIL FROM) — use opts.From.Address
 // so --from overrides propagate to the SMTP envelope for sender-login checks.
 func SmtpDeliver(ctx context.Context, config AccountConfig, from string, composedMsg []byte, recipients []string, logger *slog.Logger) error {
-	addr := fmt.Sprintf("%s:%d", config.SMTPHost, config.SMTPPort)
+	host := config.SMTPHost
+	addr := net.JoinHostPort(host, strconv.Itoa(config.SMTPPort))
 	username := config.EffectiveUsername()
 
 	logger.Debug("delivering via SMTP",
@@ -26,35 +29,54 @@ func SmtpDeliver(ctx context.Context, config AccountConfig, from string, compose
 		"size", len(composedMsg),
 	)
 
-	auth := sasl.NewPlainClient("", username, config.Password)
-	r := bytes.NewReader(composedMsg)
-
-	var err error
-	switch config.SMTPEncryption {
-	case "starttls":
-		err = smtp.SendMail(addr, auth, from, recipients, r)
-	case "tls":
-		err = smtp.SendMailTLS(addr, auth, from, recipients, r)
-	case "none":
-		err = smtp.SendMail(addr, auth, from, recipients, r)
-	default:
-		return fmt.Errorf("unsupported SMTP encryption %q: %w", config.SMTPEncryption, ErrInvalidConfig)
-	}
-
+	conn, err := dial(ctx, host, config.SMTPPort, config.SMTPEncryption)
 	if err != nil {
-		errStr := strings.ToLower(err.Error())
-		switch {
-		case strings.Contains(errStr, "authentication") || strings.Contains(errStr, "auth"):
-			return fmt.Errorf("SMTP auth: %w: %w", err, ErrAuthFailed)
-		case strings.Contains(errStr, "550") || strings.Contains(errStr, "553") || strings.Contains(errStr, "rejected"):
-			return fmt.Errorf("SMTP send: %w: %w", err, ErrSendRejected)
-		case strings.Contains(errStr, "dial") || strings.Contains(errStr, "connection") || strings.Contains(errStr, "timeout"):
-			return fmt.Errorf("SMTP connect: %w: %w", err, ErrConnectionFailed)
-		default:
-			return fmt.Errorf("SMTP send: %w", err)
+		return err
+	}
+	release := closeOnCancel(ctx, conn)
+	defer release()
+
+	var client *smtp.Client
+	if config.SMTPEncryption == "starttls" {
+		client, err = smtp.NewClientStartTLS(conn, tlsConfigFor(host))
+		if err != nil {
+			conn.Close()
+			return fmt.Errorf("SMTP starttls %s: %w: %w", addr, err, ErrConnectionFailed)
 		}
+	} else {
+		client = smtp.NewClient(conn)
+	}
+	defer client.Close()
+
+	if ok, _ := client.Extension("AUTH"); !ok {
+		return fmt.Errorf("SMTP server %s does not support AUTH: %w", addr, ErrAuthFailed)
+	}
+	if err := client.Auth(sasl.NewPlainClient("", username, config.Password)); err != nil {
+		return classifySMTPError(err)
+	}
+	if err := client.SendMail(from, recipients, bytes.NewReader(composedMsg)); err != nil {
+		return classifySMTPError(err)
+	}
+	if err := client.Quit(); err != nil {
+		return classifySMTPError(err)
 	}
 
 	logger.Debug("SMTP delivery complete", "recipients", recipients)
 	return nil
+}
+
+// classifySMTPError maps a delivery failure onto a sentinel. The matching is
+// textual because the server's reply reaches us as an opaque string.
+func classifySMTPError(err error) error {
+	errStr := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(errStr, "authentication") || strings.Contains(errStr, "auth"):
+		return fmt.Errorf("SMTP auth: %w: %w", err, ErrAuthFailed)
+	case strings.Contains(errStr, "550") || strings.Contains(errStr, "553") || strings.Contains(errStr, "rejected"):
+		return fmt.Errorf("SMTP send: %w: %w", err, ErrSendRejected)
+	case strings.Contains(errStr, "dial") || strings.Contains(errStr, "connection") || strings.Contains(errStr, "timeout"):
+		return fmt.Errorf("SMTP connect: %w: %w", err, ErrConnectionFailed)
+	default:
+		return fmt.Errorf("SMTP send: %w", err)
+	}
 }

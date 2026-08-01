@@ -150,6 +150,7 @@ Without `--json`, errors print to stderr as `error: <message>`.
 | `SEND_REJECTED` | SMTP server rejected the message |
 | `CONFIG_ERROR` | Invalid or missing configuration |
 | `USAGE_ERROR` | Bad command-line usage (exit code 2) |
+| `INTERRUPTED` | Aborted by SIGINT before completing |
 | `UNKNOWN` | Unclassified operational error |
 
 ### Commands

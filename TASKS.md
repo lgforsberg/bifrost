@@ -3,7 +3,7 @@
 **This file is the single source of truth for what we are working on.** If a task is not
 here, it is not tracked. If it is here, its phase and metadata are current.
 
-> **Next free ID: `T-033`** · IDs are never reused · last full verification sweep **2026-08-01**
+> **Next free ID: `T-034`** · IDs are never reused · last full verification sweep **2026-08-01**
 
 ## How to use this file
 
@@ -78,13 +78,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NOW
 
-- **T-004** Add real timeouts and cancellation to the network layer. The three timeout consts
-  in `imap.go` are dead code and every `ctx` parameter is ignored, so a stalled server hangs
-  bifrost forever and Ctrl-C is a no-op.
-  - [ ] dial timeouts and read/write deadlines on IMAP and SMTP connections
-  - [ ] honor `ctx` in library operations (or drop the parameters and document why)
-  - [ ] Ctrl-C observably aborts an in-flight command
-  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/imap.go:15`
 - **T-005** Fix `draft send` silently dropping Bcc recipients: `ParseMessage` never extracts
   `Bcc`, so the recompose loses them while reporting success. Unblocked by T-001, which settled
   that drafts keep the `Bcc` header on the server, so the fix is to read it back on parse.
@@ -130,6 +123,12 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## LATER
 
+- **T-033** Make the network timeouts configurable. T-004 hardcodes a 30s dial and a 60s idle
+  deadline, which is right for interactive use but arbitrary: a large attachment over a slow
+  link is fine (the deadline is per read, not total) but an agent may want to fail faster, and
+  T-029's IDLE support would need the read deadline lifted entirely. A `--timeout` global flag
+  or a config default, threaded into `dial`.
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/dial.go:12`
 - **T-015** `flag`/`unflag` commands to set and clear `\Flagged`; search can already filter on
   it but nothing can set it, and star-as-todo is a core agent pattern.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/markread.go`
@@ -197,6 +196,17 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-004** The network layer has real timeouts and honours cancellation. Both clients now run
+  over a connection carrying a 60s idle deadline on every read and write, and cancelling the
+  context drops that connection, which is the only way to interrupt commands that take no
+  context of their own.
+  - [x] dial timeouts and read/write deadlines on IMAP and SMTP connections
+  - [x] honor `ctx` in library operations
+  - [x] Ctrl-C observably aborts an in-flight command
+  ↳ done 2026-08-01 · evidence: against a listener that accepts and stays silent, the old path
+  was still blocked 5s after cancellation while `TestIMAPConnect_CancellationInterruptsSilentServer`
+  returns in 0.1s; `bifrost --json inbox` under SIGINT exits immediately with `INTERRUPTED`
+  where it used to hang; deadline and cancellation mechanics covered under `-race`; v1.2.0
 - **T-003** Attachments can no longer be written outside the target directory. Sender-supplied
   names are reduced to a bare file name, collisions are suffixed rather than overwritten, and
   the save routine moved to `internal/helpers` where it is directly testable.

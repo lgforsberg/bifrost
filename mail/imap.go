@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,16 +14,13 @@ import (
 	"github.com/emersion/go-imap/v2/imapclient"
 )
 
-const (
-	dialTimeout  = 30 * time.Second
-	readTimeout  = 60 * time.Second
-	writeTimeout = 60 * time.Second
-)
-
 type IMAPClient struct {
 	config AccountConfig
 	logger *slog.Logger
 	client *imapclient.Client
+
+	// release stops the watcher that drops the connection on cancellation.
+	release func()
 }
 
 func NewIMAPClient(config AccountConfig, logger *slog.Logger) *IMAPClient {
@@ -29,40 +28,49 @@ func NewIMAPClient(config AccountConfig, logger *slog.Logger) *IMAPClient {
 }
 
 func (c *IMAPClient) Connect(ctx context.Context) error {
-	addr := fmt.Sprintf("%s:%d", c.config.IMAPHost, c.config.IMAPPort)
+	host := c.config.IMAPHost
+	addr := net.JoinHostPort(host, strconv.Itoa(c.config.IMAPPort))
 	c.logger.Debug("connecting to IMAP", "addr", addr, "encryption", c.config.IMAPEncryption)
 
-	opts := &imapclient.Options{}
-
-	var client *imapclient.Client
-	var err error
-
-	switch c.config.IMAPEncryption {
-	case "tls":
-		client, err = imapclient.DialTLS(addr, opts)
-	case "starttls":
-		client, err = imapclient.DialStartTLS(addr, opts)
-	case "none":
-		client, err = imapclient.DialInsecure(addr, opts)
-	default:
-		return fmt.Errorf("unsupported encryption %q: %w", c.config.IMAPEncryption, ErrInvalidConfig)
-	}
+	conn, err := dial(ctx, host, c.config.IMAPPort, c.config.IMAPEncryption)
 	if err != nil {
-		return fmt.Errorf("dial %s: %w: %w", addr, err, ErrConnectionFailed)
+		return err
+	}
+	// Watch from here rather than after login, so an interrupt lands during the
+	// handshake too.
+	release := closeOnCancel(ctx, conn)
+
+	opts := &imapclient.Options{TLSConfig: tlsConfigFor(host)}
+	var client *imapclient.Client
+	if c.config.IMAPEncryption == "starttls" {
+		client, err = imapclient.NewStartTLS(conn, opts)
+		if err != nil {
+			release()
+			conn.Close()
+			return fmt.Errorf("starttls %s: %w: %w", addr, err, ErrConnectionFailed)
+		}
+	} else {
+		client = imapclient.New(conn, opts)
 	}
 
 	username := c.config.EffectiveUsername()
 	if err := client.Login(username, c.config.Password).Wait(); err != nil {
+		release()
 		client.Close()
 		return fmt.Errorf("login as %s: %w: %w", username, err, ErrAuthFailed)
 	}
 
 	c.logger.Debug("IMAP connected and authenticated", "user", username)
 	c.client = client
+	c.release = release
 	return nil
 }
 
 func (c *IMAPClient) Close() error {
+	if c.release != nil {
+		c.release()
+		c.release = nil
+	}
 	if c.client == nil {
 		return nil
 	}

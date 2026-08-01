@@ -16,7 +16,7 @@ import (
 	"github.com/lgforsberg/bifrost/mail"
 )
 
-const version = "1.1.4"
+const version = "1.2.0"
 
 func main() {
 	globals, args := parseGlobalFlags(os.Args[1:])
@@ -154,6 +154,14 @@ func handleError(g *cmdutil.GlobalFlags, err error) {
 	case errors.Is(err, mail.ErrInvalidConfig):
 		code = "CONFIG_ERROR"
 		exitCode = 2
+	}
+
+	// An interrupt drops the connection underneath the running command, so
+	// whatever error surfaced is a symptom rather than the cause.
+	if g.Ctx != nil && g.Ctx.Err() != nil {
+		code = "INTERRUPTED"
+		exitCode = 1
+		err = fmt.Errorf("interrupted: %w", err)
 	}
 
 	if strings.HasPrefix(err.Error(), "usage:") {

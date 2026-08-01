@@ -6,6 +6,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-01
+
+### Added
+
+- `INTERRUPTED` error code. SIGINT now aborts an in-flight command promptly and
+  says so, instead of being ignored until the operation finished on its own.
+
+### Fixed
+
+- Network operations can no longer block indefinitely. Neither client library
+  bounds an individual round trip, so a server that accepted a connection and
+  then stopped responding held bifrost open for as long as the process ran.
+  Every read and write now carries a 60 second idle deadline, and the 30 second
+  dial timeout is set explicitly rather than left to a library default.
+- The `ctx` argument threaded through the library is honoured. Cancelling it
+  closes the connection, which is the only way to interrupt the IMAP and SMTP
+  commands, since neither takes a context.
+- `smtp.encryption: "none"` means no encryption. It was routed through the
+  library's STARTTLS helper, so a plaintext-only relay could not be reached.
+
 ## [1.1.4] - 2026-08-01
 
 ### Security
@@ -74,7 +94,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.1.4...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/lgforsberg/bifrost/compare/v1.1.4...v1.2.0
 [1.1.4]: https://github.com/lgforsberg/bifrost/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/lgforsberg/bifrost/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/lgforsberg/bifrost/compare/v1.1.1...v1.1.2
