@@ -121,7 +121,7 @@ type SendOptions struct {
     From        Address
     To          []Address
     Cc          []Address
-    Bcc         []Address
+    Bcc         []Address // SMTP envelope only; never written as a header on delivered mail
     Subject     string
     TextBody    string
     HTMLBody    string
@@ -295,6 +295,8 @@ func ComposeMessage(opts SendOptions) ([]byte, error)
 
 Builds a complete RFC 2822 message from `SendOptions`. Generates MIME multipart when attachments are present, sets proper headers (Date, Message-ID, MIME-Version, Content-Type).
 
+No `Bcc` header is written. Blind-copied recipients belong in the SMTP envelope, which `Send` populates from `SendOptions.Bcc`; writing the header would disclose them to every other recipient. Copies that stay on the server (Sent, Drafts) do keep the header so the sender retains a record.
+
 ---
 
 ## High-Level Operations
@@ -305,7 +307,7 @@ Convenience functions that combine IMAP and SMTP operations.
 func Send(ctx context.Context, account AccountConfig, imap *IMAPClient, opts SendOptions, saveToSent bool, logger *slog.Logger) error
 ```
 
-Composes, delivers via SMTP, and optionally saves a copy to the Sent folder.
+Composes, delivers via SMTP, and optionally saves a copy to the Sent folder. Blind-copied recipients are delivered via the SMTP envelope; only the archived Sent copy carries a `Bcc` header.
 
 ```go
 func BuildReply(account AccountConfig, original *Message, body string, replyAll bool, quoteOriginal bool) SendOptions

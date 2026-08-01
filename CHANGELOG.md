@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-08-01
+
+### Security
+
+- Blind-copied recipients are no longer disclosed. `ComposeMessage` wrote a
+  `Bcc` header into the delivered message, so every `To` and `Cc` recipient
+  could read the full blind-copy list. Blind recipients now travel in the SMTP
+  envelope only; the copies filed in Sent and Drafts still carry the header so
+  the sender keeps a record.
+
 ## [1.1.0] - 2026-07-31
 
 Initial public release of Bifrost as a standalone repository.
@@ -23,5 +33,6 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/lgforsberg/bifrost/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/lgforsberg/bifrost/releases/tag/v1.1.0

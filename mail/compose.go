@@ -12,7 +12,16 @@ import (
 
 // ComposeMessage builds an RFC 822 message from SendOptions and returns
 // the raw bytes. Pure composition — no I/O, no context needed.
+//
+// The Bcc header is never written. Blind-copied recipients belong in the SMTP
+// envelope; emitting the header would disclose them to every other recipient.
 func ComposeMessage(opts SendOptions) ([]byte, error) {
+	return composeMessage(opts, false)
+}
+
+// composeMessage optionally retains the Bcc header. Only copies that stay on
+// the server (Sent, Drafts) may keep it; never hand such bytes to SMTP.
+func composeMessage(opts SendOptions, includeBcc bool) ([]byte, error) {
 	var buf bytes.Buffer
 
 	var h mail.Header
@@ -42,7 +51,7 @@ func ComposeMessage(opts SendOptions) ([]byte, error) {
 		h.SetAddressList("Cc", ccAddrs)
 	}
 
-	if len(opts.Bcc) > 0 {
+	if includeBcc && len(opts.Bcc) > 0 {
 		bccAddrs := make([]*mail.Address, len(opts.Bcc))
 		for i, a := range opts.Bcc {
 			bccAddrs[i] = &mail.Address{Name: a.Name, Address: a.Address}
