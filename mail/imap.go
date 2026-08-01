@@ -551,33 +551,42 @@ func (c *IMAPClient) FindSpecialFolder(ctx context.Context, attr string) (string
 	if err != nil {
 		return "", err
 	}
+	if name, ok := matchSpecialFolder(folders, attr); ok {
+		return name, nil
+	}
+	return "", fmt.Errorf("special folder %s: %w", attr, ErrNotFound)
+}
 
+// specialFolderFallbacks lists conventional names to try when the server does
+// not advertise the attribute, in preference order.
+var specialFolderFallbacks = map[string][]string{
+	"\\Archive": {"Archive", "Archives"},
+	"\\Sent":    {"Sent", "Sent Messages", "Sent Items"},
+	"\\Drafts":  {"Drafts", "Draft"},
+	"\\Trash":   {"Trash", "Deleted Items", "Deleted Messages"},
+	"\\Junk":    {"Junk", "Spam", "Junk E-mail"},
+}
+
+// matchSpecialFolder resolves a special-use attribute to a folder name. What
+// the server advertises always wins, because the conventional English names
+// are wrong on any localized account.
+func matchSpecialFolder(folders []Folder, attr string) (string, bool) {
 	for _, f := range folders {
 		for _, a := range f.Attributes {
 			if strings.EqualFold(a, attr) {
-				return f.Name, nil
+				return f.Name, true
 			}
 		}
 	}
 
-	fallbacks := map[string][]string{
-		"\\Sent":   {"Sent", "Sent Messages", "Sent Items"},
-		"\\Drafts": {"Drafts", "Draft"},
-		"\\Trash":  {"Trash", "Deleted Items", "Deleted Messages"},
-		"\\Junk":   {"Junk", "Spam", "Junk E-mail"},
-	}
-
-	if names, ok := fallbacks[attr]; ok {
-		for _, name := range names {
-			for _, f := range folders {
-				if strings.EqualFold(f.Name, name) {
-					return f.Name, nil
-				}
+	for _, name := range specialFolderFallbacks[attr] {
+		for _, f := range folders {
+			if strings.EqualFold(f.Name, name) {
+				return f.Name, true
 			}
 		}
 	}
-
-	return "", fmt.Errorf("special folder %s: %w", attr, ErrNotFound)
+	return "", false
 }
 
 // --- helpers ---

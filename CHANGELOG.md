@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-08-01
+
+### Fixed
+
+- `archive` resolves the `\Archive` special-use attribute instead of insisting
+  on a folder literally named `Archive`. On a localized or renamed account it
+  was creating a second, English-named folder beside the real archive and
+  moving mail into that. Sent, Drafts, Trash and Junk already worked this way.
+  When the server advertises no attribute, `Archive` and `Archives` are tried
+  before falling back to creating `Archive`.
+
 ## [1.4.1] - 2026-08-01
 
 ### Fixed
@@ -148,7 +159,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.4.2...HEAD
+[1.4.2]: https://github.com/lgforsberg/bifrost/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/lgforsberg/bifrost/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/lgforsberg/bifrost/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/lgforsberg/bifrost/compare/v1.2.0...v1.3.0

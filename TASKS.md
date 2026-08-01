@@ -85,10 +85,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   `--permanent`. Decision needed: change the default of a shipped command, or add the safe
   path behind a flag only.
   ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/imap.go:DeleteMessages`
-- **T-009** `Archive` should resolve the `\Archive` special-use attribute with a fallback list
-  (like Sent/Drafts/Trash already do) instead of hardcoding a literal `"Archive"` folder;
-  breaks on Gmail and localized folder names today.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/operations.go:Archive`
 - **T-010** Wire the `sentFolder`/`draftsFolder` config options into special-folder resolution
   or delete them: they are parsed, documented in the README, and never read anywhere.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/config/config.go:17`
@@ -190,6 +186,11 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-009** `archive` follows the server's `\Archive` folder. Special-folder matching moved into
+  a pure `matchSpecialFolder`, which made the resolution order testable.
+  ↳ done 2026-08-01 · evidence: `TestMatchSpecialFolder` pins that an advertised attribute beats
+  a conventionally named folder, which is the localized case that was broken: a Swedish account
+  with `Arkiv` was getting a second `Archive` folder created next to it. v1.4.2
 - **T-007** Errors are classified from status codes, not substrings. SMTP maps on the reply code
   and the stage it failed at; IMAP reads the response code off the typed error, keeping the
   wording as a fallback for servers that send a bare `NO`.

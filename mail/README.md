@@ -263,7 +263,7 @@ func (c *IMAPClient) EnsureFolder(ctx context.Context, name string) error
 func (c *IMAPClient) FindSpecialFolder(ctx context.Context, attr string) (string, error)
 ```
 
-`FindSpecialFolder` looks up server-advertised special-use folders by attribute (e.g. `\\Sent`, `\\Drafts`, `\\Trash`).
+`FindSpecialFolder` looks up server-advertised special-use folders by attribute (e.g. `\\Archive`, `\\Sent`, `\\Drafts`, `\\Trash`). What the server advertises wins; conventional English names are only tried when it advertises nothing, since they are wrong on a localized account.
 
 ---
 

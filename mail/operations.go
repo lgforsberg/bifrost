@@ -122,12 +122,19 @@ func BuildForward(account AccountConfig, original *Message, to []Address, body s
 	}
 }
 
-// Archive moves messages to the "Archive" folder, creating it if needed. Batch UIDs.
+// Archive moves messages to the server's archive folder. The \Archive
+// special-use attribute decides where that is; only when the server advertises
+// nothing does this fall back to a folder literally named Archive, creating it
+// if needed. Batch UIDs.
 func Archive(ctx context.Context, imap *IMAPClient, folder string, uids []uint32) error {
-	if err := imap.EnsureFolder(ctx, "Archive"); err != nil {
-		return fmt.Errorf("ensuring Archive folder: %w", err)
+	target, err := imap.FindSpecialFolder(ctx, "\\Archive")
+	if err != nil {
+		target = "Archive"
+		if err := imap.EnsureFolder(ctx, target); err != nil {
+			return fmt.Errorf("ensuring Archive folder: %w", err)
+		}
 	}
-	return imap.MoveMessages(ctx, uids, folder, "Archive")
+	return imap.MoveMessages(ctx, uids, folder, target)
 }
 
 // SaveDraft composes a message and saves it to the Drafts folder with \Draft flag.

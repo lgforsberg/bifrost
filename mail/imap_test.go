@@ -9,6 +9,68 @@ import (
 	"github.com/emersion/go-imap/v2"
 )
 
+func TestMatchSpecialFolder(t *testing.T) {
+	tests := map[string]struct {
+		folders []Folder
+		attr    string
+		want    string
+		wantOK  bool
+	}{
+		// The whole point of the attribute: on a localized account the English
+		// name is either absent or, worse, some unrelated folder.
+		"advertised attribute beats the conventional name": {
+			folders: []Folder{
+				{Name: "Archive"},
+				{Name: "Arkiv", Attributes: []string{"\\Archive"}},
+			},
+			attr:   "\\Archive",
+			want:   "Arkiv",
+			wantOK: true,
+		},
+		"attribute match is case insensitive": {
+			folders: []Folder{{Name: "Arkiv", Attributes: []string{"\\archive"}}},
+			attr:    "\\Archive",
+			want:    "Arkiv",
+			wantOK:  true,
+		},
+		"falls back to the conventional name": {
+			folders: []Folder{{Name: "INBOX"}, {Name: "Archive"}},
+			attr:    "\\Archive",
+			want:    "Archive",
+			wantOK:  true,
+		},
+		"falls back through the preference order": {
+			folders: []Folder{{Name: "INBOX"}, {Name: "Archives"}},
+			attr:    "\\Archive",
+			want:    "Archives",
+			wantOK:  true,
+		},
+		"nothing to match": {
+			folders: []Folder{{Name: "INBOX"}, {Name: "[Gmail]/All Mail", Attributes: []string{"\\All"}}},
+			attr:    "\\Archive",
+			wantOK:  false,
+		},
+		"sent still resolves": {
+			folders: []Folder{{Name: "Skickat", Attributes: []string{"\\Sent"}}},
+			attr:    "\\Sent",
+			want:    "Skickat",
+			wantOK:  true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, ok := matchSpecialFolder(tt.folders, tt.attr)
+			if ok != tt.wantOK {
+				t.Fatalf("matched = %v, want %v", ok, tt.wantOK)
+			}
+			if got != tt.want {
+				t.Errorf("folder = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestClassifyFolderError(t *testing.T) {
 	tests := []struct {
 		name         string

@@ -286,6 +286,8 @@ All are batch operations. JSON output reports `uids` acted on and `skippedUids` 
 {"status": "deleted", "uids": [42, 43], "skippedUids": [99999]}
 ```
 
+`archive` moves messages to whichever folder the server advertises as `\Archive`, so it follows a renamed or localized archive folder. If the server advertises none, it falls back to a folder named `Archive` or `Archives`, creating `Archive` if neither exists.
+
 #### `folder` — Manage folders
 
 ```
