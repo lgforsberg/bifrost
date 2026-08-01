@@ -6,6 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-08-01
+
+### Fixed
+
+- `reply` honours the original's `Reply-To` instead of always answering the
+  `From` address. A reply to a mailing list was going to whoever happened to
+  post rather than back to the list, and send-as setups had answers land on the
+  wrong mailbox. All addresses in a `Reply-To` list are used.
+- `reply --all` no longer addresses the same person twice. The sender is
+  usually in `To` as well, so they were being listed in both places.
+
+### Added
+
+- `read` reports `replyTo`, and shows it in table output when the message has
+  one.
+- `mail.Message` carries a `ReplyTo` field, parsed from the message source.
+
 ## [1.6.0] - 2026-08-01
 
 ### Changed
@@ -186,7 +203,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/lgforsberg/bifrost/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/lgforsberg/bifrost/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/lgforsberg/bifrost/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/lgforsberg/bifrost/compare/v1.4.1...v1.4.2

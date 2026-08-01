@@ -88,9 +88,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 - **T-010** Wire the `sentFolder`/`draftsFolder` config options into special-folder resolution
   or delete them: they are parsed, documented in the README, and never read anywhere.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/config/config.go:17`
-- **T-011** Parse `Reply-To` in `ParseMessage` and honor it in `BuildReply`; replies to mailing
-  lists and send-as setups currently go to the raw `From` address.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/mime.go:ParseMessage`
 - **T-013** Integration test suite. The two verified critical bugs would both have been caught
   here; `imap.go` (the largest file) is essentially untested and the command layer is at 0%.
   T-006 seeded an in-process SMTP server (`mail/send_smtp_test.go`) to build on.
@@ -182,6 +179,11 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-011** Replies follow `Reply-To`. Fixed a duplicate-recipient bug in `--all` found while
+  reworking the same addressing code.
+  ↳ done 2026-08-01 · evidence: `TestBuildReply_HonorsReplyTo` covers the mailing-list case that
+  was going to the poster instead of the list; `TestBuildReply_AllDoesNotRepeatARecipient` fails
+  on the old code, which listed a sender who was also in To twice. v1.7.0
 - **T-012** `read` and `thread` omit attachment bytes from JSON unless `--with-attachment-data`
   is given. Owner chose opt-in over opt-out. Applied to `thread` as well, where a shared
   attachment was being repeated once per message in the conversation.

@@ -72,6 +72,9 @@ func Read(g *cmdutil.GlobalFlags, args []string) error {
 
 	fmt.Printf("UID:     %d\n", msg.UID)
 	fmt.Printf("From:    %s\n", msg.From.String())
+	if len(msg.ReplyTo) > 0 {
+		fmt.Printf("Reply-To: %s\n", formatAddresses(msg.ReplyTo))
+	}
 	fmt.Printf("To:      %s\n", formatAddresses(msg.To))
 	if len(msg.Cc) > 0 {
 		fmt.Printf("Cc:      %s\n", formatAddresses(msg.Cc))

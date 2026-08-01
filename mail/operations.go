@@ -70,19 +70,30 @@ func appendToSent(ctx context.Context, imap *IMAPClient, opts SendOptions, deliv
 func BuildReply(account AccountConfig, original *Message, body string, replyAll bool, quoteOriginal bool) SendOptions {
 	inReplyTo, references := BuildReplyHeaders(original)
 
-	to := []Address{original.From}
+	to := replyTargets(original)
+
+	// Addressing the same person twice is harmless but looks careless, and
+	// reply-all readily produces it: the sender is often in To as well.
+	addressed := make(map[string]bool, len(to))
+	for _, a := range to {
+		addressed[strings.ToLower(NormalizeAddress(a.Address))] = true
+	}
 
 	var cc []Address
 	if replyAll {
-		myAddr := strings.ToLower(NormalizeAddress(account.Address))
+		addressed[strings.ToLower(NormalizeAddress(account.Address))] = true
 
 		for _, a := range original.To {
-			if strings.ToLower(NormalizeAddress(a.Address)) != myAddr {
+			key := strings.ToLower(NormalizeAddress(a.Address))
+			if !addressed[key] {
+				addressed[key] = true
 				to = append(to, a)
 			}
 		}
 		for _, a := range original.Cc {
-			if strings.ToLower(NormalizeAddress(a.Address)) != myAddr {
+			key := strings.ToLower(NormalizeAddress(a.Address))
+			if !addressed[key] {
+				addressed[key] = true
 				cc = append(cc, a)
 			}
 		}
@@ -102,6 +113,17 @@ func BuildReply(account AccountConfig, original *Message, body string, replyAll 
 		InReplyTo:  inReplyTo,
 		References: references,
 	}
+}
+
+// replyTargets is where a reply is addressed. Reply-To wins when the sender
+// set one, which is how mailing lists route answers back to the list and how
+// send-as setups keep them off the mailbox that did the sending. It is a list,
+// so all of it is honoured.
+func replyTargets(original *Message) []Address {
+	if len(original.ReplyTo) > 0 {
+		return append([]Address(nil), original.ReplyTo...)
+	}
+	return []Address{original.From}
 }
 
 // BuildForward constructs SendOptions for forwarding a message.

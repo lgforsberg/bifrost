@@ -85,6 +85,81 @@ func TestBuildReply_Basic(t *testing.T) {
 	}
 }
 
+// A mailing list sends as the poster but sets Reply-To to the list, so a reply
+// addressed to From goes to one person instead of the list.
+func TestBuildReply_HonorsReplyTo(t *testing.T) {
+	acct := AccountConfig{Address: "me@example.com"}
+	original := &Message{}
+	original.From = Address{Name: "Alice", Address: "alice@example.com"}
+	original.ReplyTo = []Address{{Name: "The List", Address: "list@example.com"}}
+	original.To = []Address{{Address: "me@example.com"}}
+	original.Subject = "Topic"
+	original.MessageID = "<t@example.com>"
+
+	opts := BuildReply(acct, original, "Agreed.", false, false)
+
+	if len(opts.To) != 1 {
+		t.Fatalf("To has %d recipients, want 1: %v", len(opts.To), opts.To)
+	}
+	if opts.To[0].Address != "list@example.com" {
+		t.Errorf("reply addressed to %q, want the Reply-To address", opts.To[0].Address)
+	}
+}
+
+func TestBuildReply_HonorsEveryReplyToAddress(t *testing.T) {
+	acct := AccountConfig{Address: "me@example.com"}
+	original := &Message{}
+	original.From = Address{Address: "alice@example.com"}
+	original.ReplyTo = []Address{
+		{Address: "list@example.com"},
+		{Address: "moderator@example.com"},
+	}
+
+	opts := BuildReply(acct, original, "Agreed.", false, false)
+
+	got := make([]string, len(opts.To))
+	for i, a := range opts.To {
+		got[i] = a.Address
+	}
+	for _, want := range []string{"list@example.com", "moderator@example.com"} {
+		if !containsStr(got, want) {
+			t.Errorf("%s missing from To %v", want, got)
+		}
+	}
+	if containsStr(got, "alice@example.com") {
+		t.Errorf("To %v includes the From address, which Reply-To overrides", got)
+	}
+}
+
+// Reply-all readily addresses the same person twice, since the sender is
+// usually in To as well.
+func TestBuildReply_AllDoesNotRepeatARecipient(t *testing.T) {
+	acct := AccountConfig{Address: "me@example.com"}
+	original := &Message{}
+	original.From = Address{Address: "alice@example.com"}
+	original.To = []Address{
+		{Address: "alice@example.com"},
+		{Address: "me@example.com"},
+		{Address: "bob@example.com"},
+	}
+	original.Cc = []Address{{Address: "bob@example.com"}}
+
+	opts := BuildReply(acct, original, "Agreed.", true, false)
+
+	seen := make(map[string]int)
+	for _, a := range append(append([]Address{}, opts.To...), opts.Cc...) {
+		seen[a.Address]++
+	}
+	for addr, n := range seen {
+		if n > 1 {
+			t.Errorf("%s appears %d times across To and Cc", addr, n)
+		}
+	}
+	if seen["me@example.com"] != 0 {
+		t.Error("the reply is addressed back to the sender's own account")
+	}
+}
+
 func TestBuildReply_AllWithSelfExclusion(t *testing.T) {
 	acct := AccountConfig{
 		Address:     "me@example.com",

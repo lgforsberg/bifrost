@@ -57,6 +57,13 @@ func ParseMessage(r io.Reader) (*Message, error) {
 			msg.Cc = append(msg.Cc, Address{Name: a.Name, Address: a.Address})
 		}
 	}
+	// Where the sender wants answers, which is not always where the message
+	// came from: mailing lists and send-as setups both rely on this.
+	if replyTo, err := h.AddressList("Reply-To"); err == nil {
+		for _, a := range replyTo {
+			msg.ReplyTo = append(msg.ReplyTo, Address{Name: a.Name, Address: a.Address})
+		}
+	}
 	if mid, err := h.MessageID(); err == nil {
 		msg.MessageID = mid
 	}

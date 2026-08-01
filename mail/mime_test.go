@@ -69,6 +69,29 @@ func TestParseMessage_LegacyCharsetInMultipart(t *testing.T) {
 	}
 }
 
+func TestParseMessage_ReadsReplyTo(t *testing.T) {
+	raw := "From: Alice <alice@example.com>\r\n" +
+		"Reply-To: The List <list@example.com>, moderator@example.com\r\n" +
+		"To: me@example.com\r\n" +
+		"Subject: Topic\r\n" +
+		"\r\n" +
+		"Body\r\n"
+
+	msg, err := ParseMessage(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseMessage error: %v", err)
+	}
+	if len(msg.ReplyTo) != 2 {
+		t.Fatalf("ReplyTo has %d addresses, want 2: %v", len(msg.ReplyTo), msg.ReplyTo)
+	}
+	if msg.ReplyTo[0].Address != "list@example.com" || msg.ReplyTo[0].Name != "The List" {
+		t.Errorf("first Reply-To = %+v, want the named list address", msg.ReplyTo[0])
+	}
+	if msg.ReplyTo[1].Address != "moderator@example.com" {
+		t.Errorf("second Reply-To = %+v", msg.ReplyTo[1])
+	}
+}
+
 func TestParseMessage_EncodedWordHeader(t *testing.T) {
 	raw := "From: =?iso-8859-1?Q?Caf=E9_Owner?= <alice@example.com>\r\n" +
 		"Subject: =?iso-8859-1?Q?Caf=E9_menu?=\r\n" +

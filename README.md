@@ -261,7 +261,9 @@ bifrost reply [--folder FOLDER] [--all] [--from ADDR] [--no-quote] [--no-save]
               [--body TEXT | --body-file PATH] <uid>
 ```
 
-Automatically sets `In-Reply-To`/`References`. Quotes the original by default (`quoteReplies`). `--all` replies to all recipients.
+Automatically sets `In-Reply-To`/`References`. Quotes the original by default (`quoteReplies`). `--all` replies to all recipients, never addressing the same person twice or copying your own account.
+
+Replies go to the original's `Reply-To` when it has one, falling back to `From`. That is what puts a reply to a mailing list back on the list rather than in the poster's personal mailbox.
 
 #### `forward` — Forward a message
 
