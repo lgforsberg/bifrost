@@ -3,7 +3,7 @@
 **This file is the single source of truth for what we are working on.** If a task is not
 here, it is not tracked. If it is here, its phase and metadata are current.
 
-> **Next free ID: `T-035`** · IDs are never reused · last full verification sweep **2026-08-01**
+> **Next free ID: `T-036`** · IDs are never reused · last full verification sweep **2026-08-01**
 
 ## How to use this file
 
@@ -81,10 +81,10 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NEXT
 
-- **T-008** 🧭 Give `delete` trash semantics: move to `\Trash` by default, expunge only with
-  `--permanent`. Decision needed: change the default of a shipped command, or add the safe
-  path behind a flag only.
-  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/imap.go:DeleteMessages`
+- **T-035** `draft delete` still expunges, so the two commands named delete now mean different
+  things. Either give it the same `--permanent` treatment as T-008 or say why a draft is
+  different. Note `SendDraft` removing a draft it just delivered should stay permanent.
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/draft.go:draftDelete`
 - **T-010** Wire the `sentFolder`/`draftsFolder` config options into special-folder resolution
   or delete them: they are parsed, documented in the README, and never read anywhere.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/config/config.go:17`
@@ -186,6 +186,12 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-008** `delete` moves to Trash; `--permanent` expunges. Owner chose to change the default
+  rather than hide the safe path behind a flag, since an agent working from UIDs had no undo.
+  ↳ done 2026-08-01 · evidence: `bifrost delete 42` now reports `movedTo`; deleting from Trash
+  expunges, as there is nowhere further to move to. `TestReorderArgs/bool_flag_before_a_positional`
+  covers the trap that a bool flag left out of the reorder map eats the UID after it. Follow-up
+  T-035 filed for `draft delete`, which still expunges. v1.5.0
 - **T-009** `archive` follows the server's `\Archive` folder. Special-folder matching moved into
   a pure `matchSpecialFolder`, which made the resolution order testable.
   ↳ done 2026-08-01 · evidence: `TestMatchSpecialFolder` pins that an advertised attribute beats

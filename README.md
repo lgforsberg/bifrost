@@ -273,7 +273,7 @@ Original attachments are included automatically; `--attach` appends more.
 #### `delete` / `archive` / `move` / `mark-read` / `mark-unread`
 
 ```
-bifrost delete       [--folder FOLDER] <uid> [uid...]
+bifrost delete       [--folder FOLDER] [--permanent] <uid> [uid...]
 bifrost archive      [--folder FOLDER] <uid> [uid...]
 bifrost move --to FOLDER [--folder FOLDER | --from FOLDER] <uid> [uid...]
 bifrost mark-read    [--folder FOLDER] <uid> [uid...]
@@ -285,6 +285,8 @@ All are batch operations. JSON output reports `uids` acted on and `skippedUids` 
 ```json
 {"status": "deleted", "uids": [42, 43], "skippedUids": [99999]}
 ```
+
+`delete` moves messages to Trash, where they can be recovered until the trash is emptied. `--permanent` expunges them instead, which cannot be undone. Deleting from Trash itself expunges, since there is nowhere further to move to. The JSON result reports `permanent` and, when the messages were moved, `movedTo`.
 
 `archive` moves messages to whichever folder the server advertises as `\Archive`, so it follows a renamed or localized archive folder. If the server advertises none, it falls back to a folder named `Archive` or `Archives`, creating `Archive` if neither exists.
 

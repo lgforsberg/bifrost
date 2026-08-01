@@ -137,6 +137,26 @@ func Archive(ctx context.Context, imap *IMAPClient, folder string, uids []uint32
 	return imap.MoveMessages(ctx, uids, folder, target)
 }
 
+// TrashMessages moves messages to the server's Trash folder, which is what
+// deleting mail normally means: recoverable until the trash is emptied. Trash
+// is created if the server advertises none. Messages already in Trash have
+// nowhere further to go and are expunged instead, in which case movedTo is
+// empty. Batch UIDs.
+func TrashMessages(ctx context.Context, imap *IMAPClient, folder string, uids []uint32) (movedTo string, err error) {
+	trash, err := imap.FindSpecialFolder(ctx, "\\Trash")
+	if err != nil {
+		trash = "Trash"
+		if err := imap.EnsureFolder(ctx, trash); err != nil {
+			return "", fmt.Errorf("ensuring Trash folder: %w", err)
+		}
+	}
+
+	if strings.EqualFold(folder, trash) {
+		return "", imap.DeleteMessages(ctx, folder, uids)
+	}
+	return trash, imap.MoveMessages(ctx, uids, folder, trash)
+}
+
 // SaveDraft composes a message and saves it to the Drafts folder with \Draft flag.
 // Extra keywords (e.g. "$PendingApproval") are stored as additional IMAP flags.
 func SaveDraft(ctx context.Context, imap *IMAPClient, opts SendOptions, keywords ...string) (uint32, error) {

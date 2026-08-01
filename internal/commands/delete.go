@@ -8,12 +8,14 @@ import (
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
 	"github.com/lgforsberg/bifrost/internal/helpers"
 	"github.com/lgforsberg/bifrost/internal/output"
+	"github.com/lgforsberg/bifrost/mail"
 )
 
 func Delete(g *cmdutil.GlobalFlags, args []string) error {
 	fs := flag.NewFlagSet("delete", flag.ContinueOnError)
 	folder := fs.String("folder", "INBOX", "folder")
-	args = helpers.ReorderArgs(args, nil)
+	permanent := fs.Bool("permanent", false, "expunge immediately instead of moving to Trash")
+	args = helpers.ReorderArgs(args, map[string]bool{"permanent": true})
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("usage: %w", err)
 	}
@@ -38,14 +40,32 @@ func Delete(g *cmdutil.GlobalFlags, args []string) error {
 		return err
 	}
 
-	if err := client.DeleteMessages(g.Ctx, *folder, v.Existing); err != nil {
+	var movedTo string
+	if *permanent {
+		err = client.DeleteMessages(g.Ctx, *folder, v.Existing)
+	} else {
+		movedTo, err = mail.TrashMessages(g.Ctx, client, *folder, v.Existing)
+	}
+	if err != nil {
 		return err
 	}
 
+	// Deleting out of Trash expunges, so the messages are gone either way.
+	gone := movedTo == ""
+
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, bulkResult("deleted", v))
+		result := bulkResult("deleted", v)
+		result["permanent"] = gone
+		if !gone {
+			result["movedTo"] = movedTo
+		}
+		return output.PrintJSON(os.Stdout, result)
+	}
+
+	if gone {
+		fmt.Printf("Permanently deleted %d message(s).\n", len(v.Existing))
 	} else {
-		fmt.Printf("Deleted %d message(s).\n", len(v.Existing))
+		fmt.Printf("Moved %d message(s) to %s.\n", len(v.Existing), movedTo)
 	}
 	return nil
 }

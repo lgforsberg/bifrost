@@ -16,7 +16,7 @@ import (
 	"github.com/lgforsberg/bifrost/mail"
 )
 
-const version = "1.4.2"
+const version = "1.5.0"
 
 func main() {
 	globals, args := parseGlobalFlags(os.Args[1:])
@@ -192,7 +192,7 @@ Commands:
   send         Compose and send a message
   reply        Reply to a message
   forward      Forward a message
-  delete       Delete messages
+  delete       Move messages to Trash (--permanent to expunge)
   archive      Archive messages
   move         Move messages to another folder
   mark-read    Mark messages as read

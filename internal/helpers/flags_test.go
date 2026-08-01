@@ -72,6 +72,14 @@ func TestReorderArgs(t *testing.T) {
 			boolFlags: map[string]bool{"peek": true},
 			want:      []string{"--folder", "Sent", "--peek", "42"},
 		},
+		// A bool flag left out of the map swallows the UID that follows it, so
+		// every command adding one has to declare it.
+		{
+			name:      "bool flag before a positional",
+			args:      []string{"--permanent", "42"},
+			boolFlags: map[string]bool{"permanent": true},
+			want:      []string{"--permanent", "42"},
+		},
 		{
 			name: "flag=value syntax",
 			args: []string{"42", "--folder=Sent"},

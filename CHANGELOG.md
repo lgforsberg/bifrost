@@ -6,6 +6,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-01
+
+### Changed
+
+- **`delete` moves messages to Trash instead of expunging them.** Deleting the
+  wrong message used to be unrecoverable, which is a poor default for a client
+  driven by agents working from UIDs. `--permanent` restores the old behaviour.
+  Deleting from Trash itself still expunges, since there is nowhere further to
+  move to, and the JSON result reports `permanent` and `movedTo` so the caller
+  can tell which happened. Trash is resolved from the `\Trash` attribute and
+  created if the server has none.
+
+### Added
+
+- `mail.TrashMessages` for the same operation from the library.
+
 ## [1.4.2] - 2026-08-01
 
 ### Fixed
@@ -159,7 +175,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/lgforsberg/bifrost/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/lgforsberg/bifrost/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/lgforsberg/bifrost/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/lgforsberg/bifrost/compare/v1.3.0...v1.4.0
