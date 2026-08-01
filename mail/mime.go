@@ -6,6 +6,9 @@ import (
 	"mime"
 	"strings"
 
+	// Registers decoders for non-UTF-8 charsets. Without it go-message handles
+	// only utf-8 and us-ascii, and iso-8859-x or windows-125x mail fails to parse.
+	_ "github.com/emersion/go-message/charset"
 	"github.com/emersion/go-message/mail"
 )
 

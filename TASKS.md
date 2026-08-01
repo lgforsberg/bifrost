@@ -82,12 +82,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   are joined unsanitized, so `../../` escapes the target directory. `filepath.Base` plus a
   post-clean containment check, with tests for traversal and absolute-path names.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/read.go:55`
-- **T-031** Register the charset decoders: with only UTF-8 and US-ASCII handled, a single-part
-  `iso-8859-1` or `windows-1252` message makes `read` fail with "unhandled charset" and a
-  multipart one silently returns an empty body, so ordinary legacy mail is unreadable. Importing
-  `_ "github.com/emersion/go-message/charset"` registers them; confirm the `go.mod` cost.
-  Verified by probe on 2026-08-01.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/mime.go:14`
 - **T-004** Add real timeouts and cancellation to the network layer. The three timeout consts
   in `imap.go` are dead code and every `ctx` parameter is ignored, so a stalled server hangs
   bifrost forever and Ctrl-C is a no-op.
@@ -207,6 +201,12 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-031** Mail in a non-UTF-8 charset parses again. Registering the go-message charset
+  decoders fixes `iso-8859-1` and `windows-1252` messages, which errored out when single-part
+  and read as empty when multipart.
+  ↳ done 2026-08-01 · evidence: `TestParseMessage_DecodesLegacyCharsets` and
+  `TestParseMessage_LegacyCharsetInMultipart` fail without the import and pass with it; the
+  x/text this pulls in was raised to v0.40.0, leaving govulncheck clean; v1.1.3
 - **T-002** A malformed message no longer hangs the parser. Consecutive MIME part failures are
   capped, so a truncated or broken body returns the headers and recovered parts instead of
   spinning on a repeated error.

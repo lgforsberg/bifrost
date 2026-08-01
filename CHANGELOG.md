@@ -6,6 +6,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-08-01
+
+### Fixed
+
+- Mail in a non-UTF-8 charset is readable again. Only UTF-8 and US-ASCII
+  decoders were registered, so an `iso-8859-1` or `windows-1252` message failed
+  to parse outright when single-part and silently produced an empty body when
+  multipart. Every charset `go-message` supports is now registered.
+
+### Security
+
+- Raised `golang.org/x/text` to v0.40.0 and `golang.org/x/sys` to v0.47.0,
+  clearing GO-2026-5970 (an infinite loop on invalid input, newly relevant now
+  that untrusted message bytes reach the charset decoders) and GO-2026-5024.
+
 ## [1.1.2] - 2026-08-01
 
 ### Fixed
@@ -43,7 +58,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.1.3...HEAD
+[1.1.3]: https://github.com/lgforsberg/bifrost/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/lgforsberg/bifrost/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/lgforsberg/bifrost/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/lgforsberg/bifrost/releases/tag/v1.1.0

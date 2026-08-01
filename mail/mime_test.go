@@ -6,6 +6,88 @@ import (
 	"time"
 )
 
+func TestParseMessage_DecodesLegacyCharsets(t *testing.T) {
+	tests := map[string]struct {
+		charset  string
+		body     string // encoded in that charset, not UTF-8
+		wantBody string
+	}{
+		"iso-8859-1": {
+			charset:  "iso-8859-1",
+			body:     "Caf\xe9",
+			wantBody: "Café",
+		},
+		// 0x93/0x94 are smart quotes in windows-1252 and undefined in latin-1,
+		// so decoding them proves the right table was picked.
+		"windows-1252": {
+			charset:  "windows-1252",
+			body:     "\x93quoted\x94",
+			wantBody: "“quoted”",
+		},
+		"utf-8": {
+			charset:  "utf-8",
+			body:     "Café",
+			wantBody: "Café",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			raw := "From: alice@example.com\r\n" +
+				"Subject: Legacy\r\n" +
+				"Content-Type: text/plain; charset=" + tt.charset + "\r\n" +
+				"\r\n" + tt.body
+
+			msg, err := ParseMessage(strings.NewReader(raw))
+			if err != nil {
+				t.Fatalf("ParseMessage error: %v", err)
+			}
+			if !strings.Contains(msg.TextBody, tt.wantBody) {
+				t.Errorf("TextBody = %q, want it to contain %q", msg.TextBody, tt.wantBody)
+			}
+		})
+	}
+}
+
+func TestParseMessage_LegacyCharsetInMultipart(t *testing.T) {
+	raw := "From: alice@example.com\r\n" +
+		"Subject: Legacy\r\n" +
+		"Content-Type: multipart/mixed; boundary=xyz\r\n" +
+		"\r\n" +
+		"--xyz\r\n" +
+		"Content-Type: text/plain; charset=iso-8859-1\r\n" +
+		"\r\n" +
+		"Caf\xe9\r\n" +
+		"--xyz--\r\n"
+
+	msg, err := ParseMessage(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseMessage error: %v", err)
+	}
+	if !strings.Contains(msg.TextBody, "Café") {
+		t.Errorf("TextBody = %q, want the latin-1 part decoded rather than dropped", msg.TextBody)
+	}
+}
+
+func TestParseMessage_EncodedWordHeader(t *testing.T) {
+	raw := "From: =?iso-8859-1?Q?Caf=E9_Owner?= <alice@example.com>\r\n" +
+		"Subject: =?iso-8859-1?Q?Caf=E9_menu?=\r\n" +
+		"Content-Type: text/plain; charset=us-ascii\r\n" +
+		"\r\n" +
+		"body"
+
+	msg, err := ParseMessage(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseMessage error: %v", err)
+	}
+	if msg.Subject != "Café menu" {
+		t.Errorf("Subject = %q, want %q", msg.Subject, "Café menu")
+	}
+	if msg.From.Name != "Café Owner" {
+		t.Errorf("From.Name = %q, want %q", msg.From.Name, "Café Owner")
+	}
+}
+
 // Every input here made the part walk spin on a repeated error before the
 // retry bound was added. Parts whose body cannot be read are skipped, so only
 // cleanly readable parts show up in the body.
