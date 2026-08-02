@@ -271,6 +271,42 @@ func (c *IMAPClient) MarkUnread(ctx context.Context, folder string, uid uint32) 
 	return c.MarkUnreadBatch(ctx, folder, []uint32{uid})
 }
 
+// AddKeyword sets an IMAP keyword such as $PendingApproval on messages.
+func (c *IMAPClient) AddKeyword(ctx context.Context, folder string, uids []uint32, keyword string) error {
+	return c.storeFlags(folder, uids, imap.StoreFlagsAdd, imap.Flag(keyword))
+}
+
+// RemoveKeyword clears an IMAP keyword. Clearing one that was never set is not
+// an error, which is what IMAP does.
+func (c *IMAPClient) RemoveKeyword(ctx context.Context, folder string, uids []uint32, keyword string) error {
+	return c.storeFlags(folder, uids, imap.StoreFlagsDel, imap.Flag(keyword))
+}
+
+// FetchFlags reads the flags of one message without pulling its body, for
+// deciding what to do with a message rather than reading it.
+func (c *IMAPClient) FetchFlags(ctx context.Context, folder string, uid uint32) ([]string, error) {
+	if _, err := c.client.Select(folder, nil).Wait(); err != nil {
+		return nil, fmt.Errorf("SELECT %s: %w", folder, err)
+	}
+
+	messages, err := c.client.Fetch(toUIDSet([]uint32{uid}), &imap.FetchOptions{
+		Flags: true,
+		UID:   true,
+	}).Collect()
+	if err != nil {
+		return nil, fmt.Errorf("FETCH flags: %w", err)
+	}
+	if len(messages) == 0 {
+		return nil, fmt.Errorf("message uid %d in %s: %w", uid, folder, ErrNotFound)
+	}
+
+	flags := make([]string, len(messages[0].Flags))
+	for i, f := range messages[0].Flags {
+		flags[i] = string(f)
+	}
+	return flags, nil
+}
+
 func (c *IMAPClient) storeFlags(folder string, uids []uint32, op imap.StoreFlagsOp, flag imap.Flag) error {
 	if _, err := c.client.Select(folder, nil).Wait(); err != nil {
 		return fmt.Errorf("SELECT %s: %w", folder, err)

@@ -375,6 +375,94 @@ func TestSearch_FindsDraftsAwaitingApproval(t *testing.T) {
 	}
 }
 
+// The keyword was advisory until now: anything could send a draft that was
+// still waiting on a human.
+func TestDraftSend_RefusesADraftAwaitingApproval(t *testing.T) {
+	cli := newTestCLI(t)
+
+	if err := Draft(cli.g, []string{"save", "--approval", "--to", "boss@example.com", "--subject", "Needs a look", "--body", "Text"}); err != nil {
+		t.Fatalf("draft save --approval: %v", err)
+	}
+	uid := fmt.Sprint(int(cli.decodeObject(t)["uid"].(float64)))
+	cli.out.Reset()
+
+	err := Draft(cli.g, []string{"send", uid})
+	if err == nil {
+		t.Fatal("sent a draft that was still awaiting approval")
+	}
+	if !errors.Is(err, mail.ErrPendingApproval) {
+		t.Errorf("error %v should wrap mail.ErrPendingApproval", err)
+	}
+	// The way out has to be in the message, or the gate is just a wall.
+	if !strings.Contains(err.Error(), "approve") || !strings.Contains(err.Error(), "--force") {
+		t.Errorf("error %q should name both ways forward", err)
+	}
+	if cli.out.Len() != 0 {
+		t.Errorf("wrote to stdout despite refusing: %q", cli.out.String())
+	}
+}
+
+func TestDraftApprove_ClearsTheKeyword(t *testing.T) {
+	cli := newTestCLI(t)
+
+	if err := Draft(cli.g, []string{"save", "--approval", "--to", "boss@example.com", "--subject", "Needs a look", "--body", "Text"}); err != nil {
+		t.Fatalf("draft save --approval: %v", err)
+	}
+	uid := fmt.Sprint(int(cli.decodeObject(t)["uid"].(float64)))
+	cli.out.Reset()
+
+	if err := Draft(cli.g, []string{"approve", uid}); err != nil {
+		t.Fatalf("draft approve: %v", err)
+	}
+	approved := cli.decodeObject(t)
+	if approved["status"] != "approved" {
+		t.Errorf("status = %v", approved["status"])
+	}
+	cli.out.Reset()
+
+	// The queue is empty again.
+	if err := Search(cli.g, []string{"--folder", "Drafts", "--keyword", "$PendingApproval"}); err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if results := cli.decodeArray(t); len(results) != 0 {
+		t.Errorf("still awaiting approval: %v", results)
+	}
+}
+
+func TestDraftApprove_UnknownUIDIsNotFound(t *testing.T) {
+	cli := newTestCLI(t)
+	cli.seed(t, "Drafts")
+
+	err := Draft(cli.g, []string{"approve", "9999"})
+	if err == nil {
+		t.Fatal("approved a draft that does not exist")
+	}
+	if !errors.Is(err, mail.ErrNotFound) {
+		t.Errorf("error %v should wrap mail.ErrNotFound", err)
+	}
+}
+
+func TestDraftSend_ForceOverridesTheGate(t *testing.T) {
+	cli := newTestCLI(t)
+
+	if err := Draft(cli.g, []string{"save", "--approval", "--to", "boss@example.com", "--subject", "Urgent", "--body", "Text"}); err != nil {
+		t.Fatalf("draft save --approval: %v", err)
+	}
+	uid := fmt.Sprint(int(cli.decodeObject(t)["uid"].(float64)))
+	cli.out.Reset()
+
+	// SMTP points at a closed port, so the send fails at delivery. That is
+	// past the gate, which is the whole point: the refusal above never gets
+	// this far.
+	err := Draft(cli.g, []string{"send", "--force", uid})
+	if err == nil {
+		t.Fatal("expected the send to fail at delivery")
+	}
+	if errors.Is(err, mail.ErrPendingApproval) {
+		t.Errorf("--force did not get past the approval gate: %v", err)
+	}
+}
+
 func TestSearch_RequiresACriterion(t *testing.T) {
 	cli := newTestCLI(t)
 

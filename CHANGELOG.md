@@ -6,6 +6,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-08-02
+
+### Added
+
+- The approval keyword is enforced. `draft send` refuses a draft still tagged
+  `$PendingApproval`, with the new `PENDING_APPROVAL` error code and exit 1,
+  and names both ways forward. It was purely advisory before, so the workflow
+  could be set up and then walked straight past.
+- `draft approve <uid>` clears the keyword, which is the other half: a gate
+  with no key is just a wall.
+- `draft send --force` sends without clearing the keyword, for when the
+  approval is not wanted rather than not given.
+- `mail.ErrPendingApproval`, `mail.KeywordPendingApproval`, `mail.HasKeyword`,
+  and `IMAPClient.AddKeyword`, `RemoveKeyword` and `FetchFlags`. `SendDraft`
+  itself is unchanged and still sends what it is given: the gate is the CLI's
+  policy, and the pieces to apply it are exported.
+
+### Fixed
+
+- `mail/README.md` had `SendDraft` returning a bare `error`, which stopped
+  being true in 1.4.0.
+
 ## [1.11.0] - 2026-08-02
 
 ### Added
@@ -301,7 +323,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.11.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.12.0...HEAD
+[1.12.0]: https://github.com/lgforsberg/bifrost/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/lgforsberg/bifrost/compare/v1.10.2...v1.11.0
 [1.10.2]: https://github.com/lgforsberg/bifrost/compare/v1.10.1...v1.10.2
 [1.10.1]: https://github.com/lgforsberg/bifrost/compare/v1.10.0...v1.10.1

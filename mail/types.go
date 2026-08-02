@@ -128,6 +128,22 @@ type SendOptions struct {
 	MessageID   string // If set, used as the Message-ID header; otherwise auto-generated
 }
 
+// KeywordPendingApproval marks a draft that should not go out until someone
+// has looked at it. The CLI refuses to send a draft carrying it, and callers
+// of SendDraft can apply the same gate with HasKeyword.
+const KeywordPendingApproval = "$PendingApproval"
+
+// HasKeyword reports whether a message carries a keyword. IMAP keywords are
+// case insensitive, and servers do vary in what they hand back.
+func HasKeyword(flags []string, keyword string) bool {
+	for _, f := range flags {
+		if strings.EqualFold(f, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
 type SearchCriteria struct {
 	From     string
 	To       string

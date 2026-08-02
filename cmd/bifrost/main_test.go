@@ -50,6 +50,11 @@ func TestClassifyError(t *testing.T) {
 			wantCode: "SEND_REJECTED",
 			wantExit: 1,
 		},
+		"pending approval": {
+			err:      fmt.Errorf("draft 7 is awaiting approval: %w", mail.ErrPendingApproval),
+			wantCode: "PENDING_APPROVAL",
+			wantExit: 1,
+		},
 		"invalid config exits 2": {
 			err:      fmt.Errorf("no accounts: %w", mail.ErrInvalidConfig),
 			wantCode: "CONFIG_ERROR",

@@ -193,7 +193,7 @@ func TrashMessages(ctx context.Context, imap *IMAPClient, folder string, uids []
 }
 
 // SaveDraft composes a message and saves it to the Drafts folder with \Draft flag.
-// Extra keywords (e.g. "$PendingApproval") are stored as additional IMAP flags.
+// Extra keywords (e.g. KeywordPendingApproval) are stored as additional IMAP flags.
 func SaveDraft(ctx context.Context, imap *IMAPClient, opts SendOptions, keywords ...string) (uint32, error) {
 	// A stored draft keeps the Bcc header so the server-side copy records the
 	// full recipient list.

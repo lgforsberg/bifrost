@@ -78,9 +78,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NOW
 
-- **T-017** `draft send` should refuse (or warn without `--force`) when the draft still carries
-  `$PendingApproval`; the keyword is purely advisory today, which defeats the approval workflow.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-02 · ref `internal/commands/draft.go:draftSend`
 
 ## NEXT
 
@@ -154,6 +151,14 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-017** `draft send` refuses a draft still tagged `$PendingApproval`, reporting the new
+  `PENDING_APPROVAL` code. Refusing rather than warning, since a warning on stderr does not stop
+  a script. The task did not ask for `draft approve`, but refusing with no way to clear the
+  keyword would have left `--force` as the only exit, which is a gate that only knows how to be
+  ignored. `SendDraft` is untouched: the gate is CLI policy, and the pieces to apply it
+  (`KeywordPendingApproval`, `HasKeyword`, `FetchFlags`) are exported for library users.
+  ↳ done 2026-08-02 · evidence: four command tests covering the refusal, the approval clearing
+  the queue, `--force` reaching delivery, and approving a UID that does not exist. v1.12.0
 - **T-016** `search --keyword`, repeatable, all of them having to match. Half the approval
   workflow: the drafts could be tagged but never found again.
   ↳ done 2026-08-02 · evidence: `TestSearch_FindsDraftsAwaitingApproval` saves one tagged draft

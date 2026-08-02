@@ -12,7 +12,7 @@ import (
 
 func Draft(g *cmdutil.GlobalFlags, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: draft <save|list|send|delete>")
+		return fmt.Errorf("usage: draft <save|list|send|approve|delete>")
 	}
 
 	sub := args[0]
@@ -25,13 +25,27 @@ func Draft(g *cmdutil.GlobalFlags, args []string) error {
 		return draftList(g, subArgs)
 	case "send":
 		return draftSend(g, subArgs)
+	case "approve":
+		return draftApprove(g, subArgs)
 	case "delete":
 		return draftDelete(g, subArgs)
 	case "help", "--help", "-h":
-		return fmt.Errorf("usage: draft <save|list|send|delete>")
+		return fmt.Errorf("usage: draft <save|list|send|approve|delete>")
 	default:
-		return fmt.Errorf("usage: unknown subcommand %q (save, list, send, delete)", sub)
+		return fmt.Errorf("usage: unknown subcommand %q (save, list, send, approve, delete)", sub)
 	}
+}
+
+// draftsFolderFor names the Drafts folder, falling back to the conventional
+// name when the server advertises nothing. The fallback is not created here:
+// every caller is about to act on a draft that is supposed to exist already,
+// so an empty guess failing is the right outcome.
+func draftsFolderFor(g *cmdutil.GlobalFlags, client *mail.IMAPClient) string {
+	folder, err := client.FindSpecialFolder(g.Ctx, "\\Drafts")
+	if err != nil {
+		return "Drafts"
+	}
+	return folder
 }
 
 func draftSave(g *cmdutil.GlobalFlags, args []string) error {
@@ -133,10 +147,7 @@ func draftList(g *cmdutil.GlobalFlags, args []string) error {
 	}
 	defer client.Close()
 
-	draftsFolder, err := client.FindSpecialFolder(g.Ctx, "\\Drafts")
-	if err != nil {
-		draftsFolder = "Drafts"
-	}
+	draftsFolder := draftsFolderFor(g, client)
 
 	envelopes, err := client.ListEnvelopes(g.Ctx, draftsFolder, *limit, *offset)
 	if err != nil {
@@ -171,11 +182,18 @@ func draftList(g *cmdutil.GlobalFlags, args []string) error {
 }
 
 func draftSend(g *cmdutil.GlobalFlags, args []string) error {
-	if len(args) < 1 {
-		return fmt.Errorf("usage: draft send <uid>")
+	fs := flag.NewFlagSet("draft send", flag.ContinueOnError)
+	force := fs.Bool("force", false, "send even if the draft is still awaiting approval")
+	args = helpers.ReorderArgs(args, map[string]bool{"force": true})
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("usage: %w", err)
 	}
 
-	uids, err := helpers.ParseUIDs(args[:1])
+	if fs.NArg() < 1 {
+		return fmt.Errorf("usage: draft send [--force] <uid>")
+	}
+
+	uids, err := helpers.ParseUIDs(fs.Args()[:1])
 	if err != nil {
 		return err
 	}
@@ -191,12 +209,62 @@ func draftSend(g *cmdutil.GlobalFlags, args []string) error {
 	}
 	defer client.Close()
 
+	draftsFolder := draftsFolderFor(g, client)
+
+	if !*force {
+		flags, err := client.FetchFlags(g.Ctx, draftsFolder, uids[0])
+		if err != nil {
+			return err
+		}
+		if mail.HasKeyword(flags, mail.KeywordPendingApproval) {
+			return fmt.Errorf(
+				"draft %d is awaiting approval: run 'draft approve %d' first, or 'draft send --force %d': %w",
+				uids[0], uids[0], uids[0], mail.ErrPendingApproval)
+		}
+	}
+
 	res, err := mail.SendDraft(g.Ctx, *acct, client, uids[0], g.Logger)
 	if err != nil {
 		return err
 	}
 
 	return reportSend(g, res, "Draft sent.")
+}
+
+func draftApprove(g *cmdutil.GlobalFlags, args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("usage: draft approve <uid>")
+	}
+
+	uids, err := helpers.ParseUIDs(args[:1])
+	if err != nil {
+		return err
+	}
+
+	client, _, err := helpers.ConnectIMAP(g.Ctx, g.Config, g.Account, g.Logger)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	draftsFolder := draftsFolderFor(g, client)
+
+	// Fetched first so approving a UID that is not there fails rather than
+	// reporting success for a message that does not exist: STORE against a
+	// missing UID is silently fine.
+	if _, err := client.FetchFlags(g.Ctx, draftsFolder, uids[0]); err != nil {
+		return err
+	}
+
+	if err := client.RemoveKeyword(g.Ctx, draftsFolder, uids[:1], mail.KeywordPendingApproval); err != nil {
+		return err
+	}
+
+	if g.JSON {
+		return output.PrintJSON(g.Out(), map[string]any{"status": "approved", "uid": uids[0]})
+	}
+	fmt.Fprintf(g.Out(), "Draft %d approved.\n", uids[0])
+	return nil
 }
 
 func draftDelete(g *cmdutil.GlobalFlags, args []string) error {
@@ -222,10 +290,7 @@ func draftDelete(g *cmdutil.GlobalFlags, args []string) error {
 	}
 	defer client.Close()
 
-	draftsFolder, err := client.FindSpecialFolder(g.Ctx, "\\Drafts")
-	if err != nil {
-		draftsFolder = "Drafts"
-	}
+	draftsFolder := draftsFolderFor(g, client)
 
 	// Same bargain as the delete command: an unsent draft is work, and losing
 	// it to a mistyped UID should be recoverable.

@@ -166,6 +166,7 @@ Without `--json`, errors print to stderr as `error: <message>`.
 | `AUTH_FAILED` | IMAP/SMTP authentication failed |
 | `CONNECTION_FAILED` | Could not connect to server |
 | `SEND_REJECTED` | SMTP server rejected the message |
+| `PENDING_APPROVAL` | Draft is still tagged `$PendingApproval` |
 | `CONFIG_ERROR` | Invalid or missing configuration |
 | `USAGE_ERROR` | Bad command-line usage (exit code 2) |
 | `INTERRUPTED` | Aborted by SIGINT before completing |
@@ -347,11 +348,25 @@ JSON output: `[{"address": "...", "displayName": "...", "default": true, "imapHo
 bifrost draft save [--to ADDR...] [--cc ADDR...] [--bcc ADDR...] [--subject TEXT]
                    [--from ADDR] [--approval] [--body TEXT | --body-file PATH] [--attach PATH...]
 bifrost draft list [--limit N] [--offset N]
-bifrost draft send <uid>
+bifrost draft send [--force] <uid>
+bifrost draft approve <uid>
 bifrost draft delete [--permanent] <uid>
 ```
 
 `save` returns the server-assigned UID (via UIDPLUS). `--approval` tags the draft with the `$PendingApproval` IMAP keyword.
+
+**The approval workflow.** A draft saved with `--approval` will not be sent. `draft send` refuses it with the `PENDING_APPROVAL` error code and exit 1, and says so without sending anything:
+
+```bash
+uid=$(bifrost --json draft save --approval --to boss@example.com \
+        --subject "Q3 numbers" --body "..." | jq -r .uid)
+
+bifrost --json search --folder Drafts --keyword '$PendingApproval'   # what is waiting
+bifrost --json draft approve "$uid"                                  # a human decides
+bifrost --json draft send "$uid"                                     # now it goes
+```
+
+`draft approve` clears the keyword and nothing else. `draft send --force` sends without clearing it, for when the approval is not wanted rather than not given.
 
 `draft delete` moves the draft to Trash, matching `delete`; `--permanent` expunges it. A draft removed by `draft send` is expunged either way, since a copy of it is already in Sent.
 

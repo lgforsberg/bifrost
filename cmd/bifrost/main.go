@@ -16,7 +16,7 @@ import (
 	"github.com/lgforsberg/bifrost/mail"
 )
 
-const version = "1.11.0"
+const version = "1.12.0"
 
 func main() {
 	globals, args := parseGlobalFlags(os.Args[1:])
@@ -183,6 +183,8 @@ func classifyError(g *cmdutil.GlobalFlags, err error) (code string, exitCode int
 		code = "CONNECTION_FAILED"
 	case errors.Is(err, mail.ErrSendRejected):
 		code = "SEND_REJECTED"
+	case errors.Is(err, mail.ErrPendingApproval):
+		code = "PENDING_APPROVAL"
 	case errors.Is(err, mail.ErrInvalidConfig):
 		code = "CONFIG_ERROR"
 		exitCode = 2
@@ -209,7 +211,7 @@ Commands:
   mark-unread  Mark messages as unread
   folder       Manage folders (list, create, rename, delete)
   accounts     List configured accounts
-  draft        Manage drafts (save, list, send, delete)
+  draft        Manage drafts (save, list, send, approve, delete)
   config       Configuration management (init)
   version      Print version
   help         Show this help

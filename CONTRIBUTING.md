@@ -92,6 +92,7 @@ exit codes. If you introduce a new failure category, add the sentinel in
 | `ErrAuthFailed` | `AUTH_FAILED` | 1 |
 | `ErrConnectionFailed` | `CONNECTION_FAILED` | 1 |
 | `ErrSendRejected` | `SEND_REJECTED` | 1 |
+| `ErrPendingApproval` | `PENDING_APPROVAL` | 1 |
 | `ErrInvalidConfig` | `CONFIG_ERROR` | 2 |
 | (`usage:` prefix) | `USAGE_ERROR` | 2 |
 | (cancelled context) | `INTERRUPTED` | 1 |

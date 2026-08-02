@@ -237,6 +237,9 @@ func (c *IMAPClient) MarkRead(ctx context.Context, folder string, uid uint32) er
 func (c *IMAPClient) MarkReadBatch(ctx context.Context, folder string, uids []uint32) error
 func (c *IMAPClient) MarkUnread(ctx context.Context, folder string, uid uint32) error
 func (c *IMAPClient) MarkUnreadBatch(ctx context.Context, folder string, uids []uint32) error
+func (c *IMAPClient) AddKeyword(ctx context.Context, folder string, uids []uint32, keyword string) error
+func (c *IMAPClient) RemoveKeyword(ctx context.Context, folder string, uids []uint32, keyword string) error
+func (c *IMAPClient) FetchFlags(ctx context.Context, folder string, uid uint32) ([]string, error)
 ```
 
 ### Message Operations
@@ -324,12 +327,21 @@ Moves messages to the Archive folder, creating it if it doesn't exist.
 
 ```go
 func SaveDraft(ctx context.Context, imap *IMAPClient, opts SendOptions, keywords ...string) (uint32, error)
-func SendDraft(ctx context.Context, account AccountConfig, imap *IMAPClient, uid uint32, logger *slog.Logger) error
+func SendDraft(ctx context.Context, account AccountConfig, imap *IMAPClient, uid uint32, logger *slog.Logger) (SendResult, error)
 ```
 
-`SaveDraft` saves to Drafts with `\Draft` and `\Seen` flags, plus optional IMAP keywords (e.g. `$PendingApproval`). Returns server-assigned UID.
+`SaveDraft` saves to Drafts with `\Draft` and `\Seen` flags, plus optional IMAP keywords (e.g. `KeywordPendingApproval`). Returns server-assigned UID.
 
-`SendDraft` fetches a draft, delivers it, removes it from Drafts, and saves to Sent.
+`SendDraft` fetches a draft, delivers it, removes it from Drafts, and saves to Sent. The returned `SendResult` carries the message id and any warnings from the steps after delivery.
+
+`SendDraft` sends whatever it is given. It does not check for `KeywordPendingApproval`, because a library should do as it is told; the CLI applies that gate itself, and so can you:
+
+```go
+flags, err := client.FetchFlags(ctx, "Drafts", uid)
+if err == nil && mail.HasKeyword(flags, mail.KeywordPendingApproval) {
+    return fmt.Errorf("not approved yet")
+}
+```
 
 ---
 
