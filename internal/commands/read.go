@@ -69,6 +69,12 @@ func Read(g *cmdutil.GlobalFlags, args []string) error {
 		return output.PrintJSON(g.Out(), msg)
 	}
 
+	// Anything the parser could not read cleanly, before the body it affects.
+	// On stderr like every other warning, so a piped body stays a body.
+	for _, w := range msg.Warnings {
+		fmt.Fprintf(g.Err(), "warning: %s\n", w)
+	}
+
 	fmt.Fprintf(g.Out(), "UID:     %d\n", msg.UID)
 	fmt.Fprintf(g.Out(), "From:    %s\n", msg.From.String())
 	if len(msg.ReplyTo) > 0 {

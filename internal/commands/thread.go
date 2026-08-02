@@ -67,6 +67,9 @@ func Thread(g *cmdutil.GlobalFlags, args []string) error {
 		if i > 0 {
 			fmt.Fprintln(g.Out(), "---")
 		}
+		for _, w := range msg.Warnings {
+			fmt.Fprintf(g.Err(), "warning: uid %d: %s\n", msg.UID, w)
+		}
 		fmt.Fprintf(g.Out(), "UID:     %d\n", msg.UID)
 		if msg.Folder != "" {
 			fmt.Fprintf(g.Out(), "Folder:  %s\n", msg.Folder)

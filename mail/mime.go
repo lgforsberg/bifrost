@@ -2,9 +2,12 @@ package mail
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"strings"
+
+	message "github.com/emersion/go-message"
 
 	// Registers decoders for non-UTF-8 charsets. Without it go-message handles
 	// only utf-8 and us-ascii, and iso-8859-x or windows-125x mail fails to parse.
@@ -20,16 +23,28 @@ const maxConsecutiveBadParts = 10
 // ParseMessage reads an RFC 2822 message from r and extracts headers,
 // text/html bodies, and attachments. Pure parsing — no I/O beyond the reader.
 //
-// Parsing is best-effort: a message whose MIME structure breaks part way
-// through yields the headers and the parts read up to that point.
+// Parsing is best-effort. A message whose MIME structure breaks part way
+// through yields the headers and whatever was read before it broke, and one
+// labelled with a charset or transfer encoding we cannot decode is read as
+// raw bytes rather than refused. Anything lost or left undecoded is recorded
+// in Message.Warnings, so best-effort never means silent.
 func ParseMessage(r io.Reader) (*Message, error) {
-	mr, err := mail.CreateReader(r)
-	if err != nil {
+	// message.Read rather than mail.CreateReader: both return a usable entity
+	// when the charset or the transfer encoding is one they cannot decode, but
+	// CreateReader throws that entity away for an unknown encoding and reports
+	// only the error. Taking the error at face value there loses the whole
+	// message, headers included, over one bad label.
+	e, err := message.Read(r)
+	if e == nil {
 		return nil, err
 	}
 
 	msg := &Message{}
+	if err != nil {
+		msg.Warnings = append(msg.Warnings, fmt.Sprintf("message read without decoding: %v", err))
+	}
 
+	mr := mail.NewReader(e)
 	h := mr.Header
 	if date, err := h.Date(); err == nil {
 		msg.Date = date
@@ -80,23 +95,37 @@ func ParseMessage(r io.Reader) (*Message, error) {
 		if errors.Is(err, io.EOF) {
 			break
 		}
-		if err != nil {
-			// Gracefully skip malformed parts, but stop once they stop being
-			// occasional: a broken body repeats one error indefinitely.
+		if p == nil {
+			// Nothing to salvage. Skip it, but stop once the failures stop
+			// being occasional: a broken body repeats one error indefinitely
+			// without ever advancing.
 			badParts++
+			msg.Warnings = append(msg.Warnings, fmt.Sprintf("skipped an unreadable part: %v", err))
 			if badParts >= maxConsecutiveBadParts {
+				msg.Warnings = append(msg.Warnings,
+					fmt.Sprintf("stopped reading after %d unreadable parts in a row", badParts))
 				break
 			}
 			continue
 		}
 		badParts = 0
+		if err != nil {
+			// A part the reader could not decode but handed over regardless.
+			// The bytes are undecoded rather than absent, so they are worth
+			// keeping; the warning is what says they may not read as text.
+			msg.Warnings = append(msg.Warnings, fmt.Sprintf("part read without decoding: %v", err))
+		}
 
 		switch h := p.Header.(type) {
 		case *mail.InlineHeader:
 			ct, _, _ := h.ContentType()
 			body, readErr := io.ReadAll(p.Body)
 			if readErr != nil {
-				continue
+				// io.ReadAll returns what it managed to read alongside the
+				// error. Keeping that prefix is the whole difference between
+				// a truncated message and an apparently empty one.
+				msg.Warnings = append(msg.Warnings, fmt.Sprintf(
+					"%s part truncated after %d bytes: %v", ct, len(body), readErr))
 			}
 			switch {
 			case strings.HasPrefix(ct, "text/plain"):
@@ -113,7 +142,11 @@ func ParseMessage(r io.Reader) (*Message, error) {
 			ct, _, _ := h.ContentType()
 			data, readErr := io.ReadAll(p.Body)
 			if readErr != nil {
-				continue
+				// Surfaced rather than withheld. A partial file is sometimes
+				// still usable, and one that disappears tells the reader
+				// nothing at all; the warning is what says not to trust it.
+				msg.Warnings = append(msg.Warnings, fmt.Sprintf(
+					"attachment %q truncated after %d bytes: %v", filename, len(data), readErr))
 			}
 			msg.Attachments = append(msg.Attachments, Attachment{
 				Filename:    filename,

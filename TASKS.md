@@ -3,7 +3,7 @@
 **This file is the single source of truth for what we are working on.** If a task is not
 here, it is not tracked. If it is here, its phase and metadata are current.
 
-> **Next free ID: `T-040`** · IDs are never reused · last full verification sweep **2026-08-01**
+> **Next free ID: `T-042`** · IDs are never reused · last full verification sweep **2026-08-01**
 
 ## How to use this file
 
@@ -78,8 +78,24 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NOW
 
+- **T-019** `read --raw` to emit the RFC 822 source (.eml) for archival, forward-as-attachment,
+  and debugging parse issues. Pairs with T-032: when a message parses badly, the raw source is
+  how anyone sees what actually arrived.
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-02 · ref `internal/commands/read.go`
 
 ## NEXT
+
+- **T-015** `flag`/`unflag` commands to set and clear `\Flagged`; search can already filter on
+  it but nothing can set it, and star-as-todo is a core agent pattern.
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/markread.go`
+- **T-018** `folder status` command exposing IMAP STATUS (total, unseen, uidnext) so an agent
+  can ask "how many unread?" without listing envelopes.
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/folder.go`
+- **T-039** `bifrost inbox --help` fails with a config error instead of printing the flags: config
+  is loaded during dispatch, before the subcommand parses anything, so no per-command help is
+  reachable without a working account. Discovering what a command takes should not require
+  credentials. Parse for `-h`/`--help` before loading, or defer the load until after `fs.Parse`.
+  ↳ since 2026-08-02 · pushed 0 · size S · verified 2026-08-02 · ref `cmd/bifrost/main.go` dispatch
 
 ## LATER
 
@@ -93,26 +109,19 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   T-029's IDLE support would need the read deadline lifted entirely. A `--timeout` global flag
   or a config default, threaded into `dial`.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/dial.go:dialTimeout`
-- **T-015** `flag`/`unflag` commands to set and clear `\Flagged`; search can already filter on
-  it but nothing can set it, and star-as-todo is a core agent pattern.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/markread.go`
-- **T-018** `folder status` command exposing IMAP STATUS (total, unseen, uidnext) so an agent
-  can ask "how many unread?" without listing envelopes.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/folder.go`
-- **T-019** `read --raw` to emit the RFC 822 source (.eml) for archival, forward-as-attachment,
-  and debugging parse issues.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/read.go`
+- **T-041** Recover a part inside a multipart whose transfer encoding has no decoder. T-032 fixed
+  this for a whole message by going through `message.Read`, but `mail.Reader.NextPart` returns a
+  nil part for the same case nested in a multipart, so those bytes are still lost (skipped with a
+  warning, not silently). Recovering them means walking at the `message` level and reimplementing
+  the six-line inline/attachment split from go-message's `mail` reader. Deliberately not bundled
+  into T-032: swapping the walk is a structural change, not a bug fix.
+  ↳ since 2026-08-02 · pushed 0 · size M · verified 2026-08-02 · ref `mail/mime.go:ParseMessage part walk`
 - **T-020** HTML sending: `--body-html` on `send`/`reply`/`forward`/`draft save`; the library
   already composes multipart/alternative, the CLI just never exposes `HTMLBody`.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/send.go`
 - **T-021** Cross-folder search (repeatable `--folder` or `--all-folders`); triage across
   folders currently needs one invocation per folder.
   ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `internal/commands/search.go`
-- **T-039** `bifrost inbox --help` fails with a config error instead of printing the flags: config
-  is loaded during dispatch, before the subcommand parses anything, so no per-command help is
-  reachable without a working account. Discovering what a command takes should not require
-  credentials. Parse for `-h`/`--help` before loading, or defer the load until after `fs.Parse`.
-  ↳ since 2026-08-02 · pushed 0 · size S · verified 2026-08-02 · ref `cmd/bifrost/main.go` dispatch
 - **T-023** `draft update <uid>`: append the revised draft and delete the old one in a single
   command so agent revision loops are not save-new-then-delete-old by hand.
   ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `internal/commands/draft.go`
@@ -120,11 +129,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   distant thread members), envelope-only discovery instead of full-body fetches, and
   `slices.SortFunc` over the hand-rolled insertion sort.
   ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/imap.go:FetchThread`
-- **T-032** Fall back to raw bytes instead of dropping a part the reader cannot fully decode.
-  A body read that fails part way discards the readable prefix (a truncated message reads as
-  empty), and a part with an unhandled `Content-Transfer-Encoding` is skipped outright. Decide
-  separately whether a partial attachment should be surfaced or withheld as a corrupt file.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/mime.go:ParseMessage part walk`
 - **T-026** Code hygiene batch: rune-safe `truncate`; `filepath.Ext` over `fileExtension`;
   unchecked `int64`→`uint32` casts; global flag parser silently drops a missing
   `--account`/`--config` value; version from build info instead of a hand-maintained const;
@@ -153,6 +157,14 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-032** Damaged messages are read for what they contain instead of refused. Re-verification
+  found it worse than filed: an unknown charset or transfer encoding failed the *whole* message,
+  headers included, because `mail.CreateReader` reports an error while still holding a readable
+  entity (and discards it entirely for an encoding). `ParseMessage` goes through `message.Read`
+  now. Partial attachments are surfaced with a warning rather than withheld, since a file that
+  disappears is indistinguishable from one never sent. Residual case filed as T-041.
+  ↳ done 2026-08-02 · evidence: probes confirmed the old behaviour first (empty body, nil message
+  twice, vanished attachment); six parser tests and three command tests now cover it. v1.14.0
 - **T-022** Pagination metadata behind `--with-total` on `inbox` and `search`, rather than changing
   the default shape. Three things ruled out breaking the bare array: it is the contract every
   existing script reads, the module version covers `package mail` too (so a breaking CLI change

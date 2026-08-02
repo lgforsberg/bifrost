@@ -104,6 +104,12 @@ type Message struct {
 	InReplyTo   string       `json:"inReplyTo,omitempty"`
 	References  []string     `json:"references,omitempty"`
 	Folder      string       `json:"folder,omitempty"`
+	// Warnings records what did not survive parsing intact: a body that
+	// stopped part way, a part read without being decoded, a part skipped
+	// altogether. Empty for the overwhelming majority of mail. When it is not,
+	// the message is still worth reading, but anything acting on the body
+	// should know it may be incomplete before it replies or files it away.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // SendResult reports the outcome of a delivery. Handing the message to the

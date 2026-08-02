@@ -227,6 +227,20 @@ Attachment bytes are left out of the JSON unless you ask for them: base64 makes 
 
 `--save-attachments` reduces each sender-supplied filename to a bare file name, so an attachment can never be written outside the given directory. Colliding names are suffixed rather than overwritten. Files are written mode 0600 into a directory created 0700.
 
+##### Damaged messages
+
+Parsing is best-effort, and it tells you when it had to be. A message cut off in transit yields the bytes that did arrive; one labelled with a charset or transfer encoding Bifrost cannot decode is read as raw bytes rather than refused; a part that cannot be read at all is skipped. Every such case is listed in `warnings`, which is absent from the JSON for the overwhelming majority of mail:
+
+```json
+{
+  "subject": "Quarterly report",
+  "textBody": "Please see the attach",
+  "warnings": ["text/plain part truncated after 21 bytes: unexpected EOF"]
+}
+```
+
+In table mode the warnings go to stderr, so a piped body is still just a body. A truncated attachment is reported and kept rather than withheld, since a partial file is sometimes usable and one that silently disappears tells you nothing. Treat a message carrying warnings as incomplete before replying to it or filing it away. `thread` reports the same warnings per message.
+
 #### `search` — Server-side IMAP search
 
 ```

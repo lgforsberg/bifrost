@@ -6,6 +6,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-08-02
+
+### Fixed
+
+- A message cut off in transit no longer reads as empty. `io.ReadAll` returns
+  the bytes it managed to read alongside the error, and the parser was
+  discarding them, so a truncated body or attachment disappeared entirely.
+- A charset or `Content-Transfer-Encoding` with no decoder no longer fails the
+  whole message. `mail.CreateReader` reports an error for these while still
+  holding a readable entity, and for an unknown encoding it drops the entity
+  outright; `ParseMessage` now goes through `message.Read` and reads the part
+  as raw bytes. Before this, one mislabelled charset made a message unreadable
+  down to its headers.
+- A truncated attachment is surfaced with a warning rather than silently
+  dropped, since a file that disappears is indistinguishable from one that was
+  never sent.
+
+### Added
+
+- `mail.Message.Warnings` records anything that did not survive parsing
+  intact. `read` and `thread` include it in JSON (absent when empty) and print
+  it to stderr in table mode, so a piped body stays a body.
+
 ## [1.13.0] - 2026-08-02
 
 ### Added
@@ -342,7 +365,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.13.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.14.0...HEAD
+[1.14.0]: https://github.com/lgforsberg/bifrost/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/lgforsberg/bifrost/compare/v1.12.0...v1.13.0
 [1.12.0]: https://github.com/lgforsberg/bifrost/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/lgforsberg/bifrost/compare/v1.10.2...v1.11.0

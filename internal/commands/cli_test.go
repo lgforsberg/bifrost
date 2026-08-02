@@ -112,6 +112,31 @@ func (c *testCLI) seed(t *testing.T, folder string, subjects ...string) []uint32
 }
 
 // decodeObject reads what the command wrote as a JSON object.
+// seedRaw appends a message verbatim, for the shapes seed cannot express:
+// damaged MIME, odd encodings, anything where the exact bytes are the point.
+func (c *testCLI) seedRaw(t *testing.T, folder, raw string) uint32 {
+	t.Helper()
+
+	acct, err := config.DefaultAccount(c.g.Config)
+	if err != nil {
+		t.Fatalf("resolving the account: %v", err)
+	}
+	client := mail.NewIMAPClient(*acct, c.g.Logger)
+	if err := client.Connect(c.g.Ctx); err != nil {
+		t.Fatalf("connecting to seed a message: %v", err)
+	}
+	defer client.Close()
+
+	if err := client.EnsureFolder(c.g.Ctx, folder); err != nil {
+		t.Fatalf("ensuring %s: %v", folder, err)
+	}
+	uid, err := client.AppendMessage(c.g.Ctx, folder, []byte(raw), []string{"\\Seen"})
+	if err != nil {
+		t.Fatalf("appending the message: %v", err)
+	}
+	return uid
+}
+
 func (c *testCLI) decodeObject(t *testing.T) map[string]any {
 	t.Helper()
 
@@ -246,6 +271,76 @@ func TestInbox_WithTotalOnAnEmptyFolder(t *testing.T) {
 	// Still an array rather than null, same as the bare form.
 	if messages, ok := page["messages"].([]any); !ok || len(messages) != 0 {
 		t.Errorf("messages = %v, want an empty array", page["messages"])
+	}
+}
+
+// A message damaged in transit must still read, and must say that it is
+// damaged. Reading one used to fail outright, which left an agent with no way
+// to tell a broken message from a broken mailbox.
+func TestRead_DamagedMessageStillReadsAndSaysSo(t *testing.T) {
+	cli := newTestCLI(t)
+	// An encoding with no decoder, which the reader used to refuse entirely.
+	uid := cli.seedRaw(t, "INBOX", "From: alice@example.com\r\n"+
+		"To: "+testAddress+"\r\n"+
+		"Subject: Ancient client\r\n"+
+		"Content-Type: text/plain; charset=utf-8\r\n"+
+		"Content-Transfer-Encoding: x-uuencode\r\n"+
+		"\r\n"+
+		"the body survived\r\n")
+
+	if err := Read(cli.g, []string{fmt.Sprintf("%d", uid)}); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+
+	msg := cli.decodeObject(t)
+	if subject, _ := msg["subject"].(string); subject != "Ancient client" {
+		t.Errorf("subject = %q, want the headers through", subject)
+	}
+	if body, _ := msg["textBody"].(string); !strings.Contains(body, "the body survived") {
+		t.Errorf("textBody = %q, want the undecoded bytes", body)
+	}
+	warnings, ok := msg["warnings"].([]any)
+	if !ok || len(warnings) == 0 {
+		t.Fatalf("warnings = %v, want the damage reported", msg["warnings"])
+	}
+}
+
+// In table mode the warning belongs on stderr, so a piped body is still a body.
+func TestRead_WarningsStayOffStdout(t *testing.T) {
+	cli := newTestCLI(t)
+	cli.g.JSON = false
+	uid := cli.seedRaw(t, "INBOX", "From: alice@example.com\r\n"+
+		"Subject: Odd label\r\n"+
+		"Content-Type: text/plain; charset=x-nonesuch\r\n"+
+		"\r\n"+
+		"readable anyway\r\n")
+
+	if err := Read(cli.g, []string{fmt.Sprintf("%d", uid)}); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+
+	if !strings.Contains(cli.out.String(), "readable anyway") {
+		t.Errorf("stdout missing the body:\n%s", cli.out.String())
+	}
+	if strings.Contains(cli.out.String(), "warning:") {
+		t.Errorf("warning leaked onto stdout:\n%s", cli.out.String())
+	}
+	if !strings.Contains(cli.err.String(), "warning:") {
+		t.Errorf("stderr missing the warning:\n%s", cli.err.String())
+	}
+}
+
+// The common case has to stay quiet, or the warnings are noise.
+func TestRead_CleanMessageCarriesNoWarnings(t *testing.T) {
+	cli := newTestCLI(t)
+	uids := cli.seed(t, "INBOX", "Ordinary")
+
+	if err := Read(cli.g, []string{fmt.Sprintf("%d", uids[0])}); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+
+	if warnings, present := cli.decodeObject(t)["warnings"]; present {
+		t.Errorf("warnings = %v, want the key absent for a clean message", warnings)
 	}
 }
 

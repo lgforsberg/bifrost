@@ -374,3 +374,185 @@ func TestParseMessage_MultipartRelatedDrained(t *testing.T) {
 		t.Errorf("TextBody = %q, expected text after multipart/related to be parsed", msg.TextBody)
 	}
 }
+
+// The four ways a damaged message used to come back wrong. Each of these
+// returned nothing at all, or nothing useful, before the parser learned to
+// keep what it could read.
+
+// io.ReadAll hands back the bytes it managed to read alongside the error, and
+// the old code dropped them, so a message cut off in transit read as empty.
+func TestParseMessage_KeepsThePrefixOfATruncatedBody(t *testing.T) {
+	// "Hello, world!" encodes to SGVsbG8sIHdvcmxkIQ==, cut here to an
+	// incomplete final group so the decoder fails after the readable part.
+	raw := "From: sender@example.com\r\n" +
+		"To: rcpt@example.com\r\n" +
+		"Subject: Cut short\r\n" +
+		"Content-Type: text/plain; charset=utf-8\r\n" +
+		"Content-Transfer-Encoding: base64\r\n" +
+		"\r\n" +
+		"SGVsbG8sIHdvcmxkIQ"
+
+	msg, err := ParseMessage(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseMessage: %v", err)
+	}
+	if !strings.HasPrefix(msg.TextBody, "Hello, world") {
+		t.Errorf("TextBody = %q, want the part that was readable", msg.TextBody)
+	}
+	if len(msg.Warnings) == 0 {
+		t.Error("a truncated body should be reported, not quietly patched over")
+	}
+	if msg.Subject != "Cut short" {
+		t.Errorf("Subject = %q, want the headers intact", msg.Subject)
+	}
+}
+
+// An attachment that stops part way used to vanish, which reads exactly like a
+// message that never carried one.
+func TestParseMessage_KeepsATruncatedAttachment(t *testing.T) {
+	raw := "From: sender@example.com\r\n" +
+		"Subject: Report\r\n" +
+		"Content-Type: multipart/mixed; boundary=BOUND\r\n" +
+		"\r\n" +
+		"--BOUND\r\n" +
+		"Content-Type: text/plain\r\n" +
+		"\r\n" +
+		"See attached.\r\n" +
+		"--BOUND\r\n" +
+		"Content-Type: application/pdf\r\n" +
+		"Content-Disposition: attachment; filename=\"report.pdf\"\r\n" +
+		"Content-Transfer-Encoding: base64\r\n" +
+		"\r\n" +
+		"SGVsbG8sIHdvcmxkIQ\r\n" +
+		"--BOUND--\r\n"
+
+	msg, err := ParseMessage(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseMessage: %v", err)
+	}
+	if len(msg.Attachments) != 1 {
+		t.Fatalf("got %d attachments, want the damaged one surfaced rather than dropped", len(msg.Attachments))
+	}
+	att := msg.Attachments[0]
+	if att.Filename != "report.pdf" {
+		t.Errorf("Filename = %q, want report.pdf", att.Filename)
+	}
+	if att.Size != int64(len(att.Data)) {
+		t.Errorf("Size %d does not match the %d bytes actually held", att.Size, len(att.Data))
+	}
+	if len(msg.Warnings) == 0 {
+		t.Error("a partial attachment must carry a warning, or it looks like a whole file")
+	}
+	if !strings.Contains(msg.TextBody, "See attached") {
+		t.Errorf("TextBody = %q, want the good part unaffected", msg.TextBody)
+	}
+}
+
+// A charset nothing can decode used to fail the entire message, headers and
+// all, over a single mislabelled parameter.
+func TestParseMessage_ReadsThroughAnUnknownCharset(t *testing.T) {
+	raw := "From: sender@example.com\r\n" +
+		"Subject: Odd label\r\n" +
+		"Content-Type: text/plain; charset=x-nonesuch\r\n" +
+		"\r\n" +
+		"perfectly readable ascii\r\n"
+
+	msg, err := ParseMessage(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseMessage: %v", err)
+	}
+	if !strings.Contains(msg.TextBody, "perfectly readable ascii") {
+		t.Errorf("TextBody = %q, want the undecoded bytes", msg.TextBody)
+	}
+	if msg.Subject != "Odd label" {
+		t.Errorf("Subject = %q, want the headers intact", msg.Subject)
+	}
+	if len(msg.Warnings) == 0 {
+		t.Error("reading a part without decoding it should be reported")
+	}
+}
+
+// Same for a transfer encoding the reader has no decoder for. This one is why
+// ParseMessage calls message.Read directly: mail.CreateReader discards the
+// entity here and reports only the error.
+func TestParseMessage_ReadsThroughAnUnknownTransferEncoding(t *testing.T) {
+	raw := "From: sender@example.com\r\n" +
+		"Subject: Ancient client\r\n" +
+		"Content-Type: text/plain; charset=utf-8\r\n" +
+		"Content-Transfer-Encoding: x-uuencode\r\n" +
+		"\r\n" +
+		"body text here\r\n"
+
+	msg, err := ParseMessage(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseMessage: %v", err)
+	}
+	if !strings.Contains(msg.TextBody, "body text here") {
+		t.Errorf("TextBody = %q, want the raw bytes", msg.TextBody)
+	}
+	if msg.Subject != "Ancient client" {
+		t.Errorf("Subject = %q, want the headers intact", msg.Subject)
+	}
+	if len(msg.Warnings) == 0 {
+		t.Error("an undecodable encoding should be reported")
+	}
+}
+
+// The common case must stay silent, or warnings become noise nobody reads.
+func TestParseMessage_CleanMessageWarnsAboutNothing(t *testing.T) {
+	raw := "From: sender@example.com\r\n" +
+		"To: rcpt@example.com\r\n" +
+		"Subject: Ordinary\r\n" +
+		"Content-Type: text/plain; charset=utf-8\r\n" +
+		"\r\n" +
+		"Nothing wrong here.\r\n"
+
+	msg, err := ParseMessage(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseMessage: %v", err)
+	}
+	if len(msg.Warnings) != 0 {
+		t.Errorf("Warnings = %v, want none for a well-formed message", msg.Warnings)
+	}
+}
+
+// One bad part inside a multipart must not cost the others. The reader will
+// not hand this part over at all (see T-041), so its content is genuinely
+// lost, but the walk carries on and the loss is named rather than silent.
+func TestParseMessage_OneBadPartDoesNotCostTheRest(t *testing.T) {
+	raw := "From: sender@example.com\r\n" +
+		"Subject: Mixed\r\n" +
+		"Content-Type: multipart/mixed; boundary=BOUND\r\n" +
+		"\r\n" +
+		"--BOUND\r\n" +
+		"Content-Type: text/plain\r\n" +
+		"\r\n" +
+		"good part\r\n" +
+		"--BOUND\r\n" +
+		"Content-Type: text/plain\r\n" +
+		"Content-Transfer-Encoding: x-uuencode\r\n" +
+		"\r\n" +
+		"odd part\r\n" +
+		"--BOUND\r\n" +
+		"Content-Type: application/pdf\r\n" +
+		"Content-Disposition: attachment; filename=\"a.pdf\"\r\n" +
+		"\r\n" +
+		"PDFBYTES\r\n" +
+		"--BOUND--\r\n"
+
+	msg, err := ParseMessage(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseMessage: %v", err)
+	}
+	if !strings.Contains(msg.TextBody, "good part") {
+		t.Errorf("TextBody = %q, want the part before the bad one", msg.TextBody)
+	}
+	// The attachment comes after the failure, so this is the assertion that
+	// the walk resumed instead of stopping at the first thing it could not do.
+	if len(msg.Attachments) != 1 {
+		t.Errorf("got %d attachments, want the one that follows the bad part", len(msg.Attachments))
+	}
+	if len(msg.Warnings) == 0 {
+		t.Error("the skipped part must be named, or it is silent data loss")
+	}
+}
