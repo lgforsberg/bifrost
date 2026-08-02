@@ -96,9 +96,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   the six-line inline/attachment split from go-message's `mail` reader. Deliberately not bundled
   into T-032: swapping the walk is a structural change, not a bug fix.
   ↳ since 2026-08-02 · pushed 0 · size M · verified 2026-08-02 · ref `mail/mime.go:ParseMessage part walk`
-- **T-023** `draft update <uid>`: append the revised draft and delete the old one in a single
-  command so agent revision loops are not save-new-then-delete-old by hand.
-  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `internal/commands/draft.go`
 - **T-025** `FetchThread` rework: iterative reference expansion (current single hop misses
   distant thread members), envelope-only discovery instead of full-body fetches, and
   `slices.SortFunc` over the hand-rolled insertion sort.
@@ -125,6 +122,12 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-023** `draft update <uid>` replaces a draft with a revised one. Wholesale replacement, not a
+  merge, matching what the task described and what a revising agent already has to hand. Keeps
+  `$PendingApproval` so a revision cannot leave the approval queue.
+  ↳ done 2026-08-02 · evidence: five CLI tests over the in-memory IMAP server: the round trip
+  leaving one draft behind, approval preserved and still blocking `draft send`, approval not
+  invented, a missing UID reported as NOT_FOUND, and the usage error. v1.22.0
 - **T-021** Cross-folder search: `--folder` repeats and `--all-folders` covers everything
   selectable, merged by date with the limit and total applied across the merge. Required
   `Envelope.Folder`, without which a merged UID identifies nothing.

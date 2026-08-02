@@ -12,7 +12,7 @@ import (
 
 func Draft(g *cmdutil.GlobalFlags, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: draft <save|list|send|approve|delete>")
+		return fmt.Errorf("usage: draft <save|update|list|send|approve|delete>")
 	}
 
 	sub := args[0]
@@ -21,6 +21,8 @@ func Draft(g *cmdutil.GlobalFlags, args []string) error {
 	switch sub {
 	case "save":
 		return draftSave(g, subArgs)
+	case "update":
+		return draftUpdate(g, subArgs)
 	case "list":
 		return draftList(g, subArgs)
 	case "send":
@@ -30,9 +32,9 @@ func Draft(g *cmdutil.GlobalFlags, args []string) error {
 	case "delete":
 		return draftDelete(g, subArgs)
 	case "help", "--help", "-h":
-		return g.Usage("usage: draft <save|list|send|approve|delete>")
+		return g.Usage("usage: draft <save|update|list|send|approve|delete>")
 	default:
-		return fmt.Errorf("usage: unknown subcommand %q (save, list, send, approve, delete)", sub)
+		return fmt.Errorf("usage: unknown subcommand %q (save, update, list, send, approve, delete)", sub)
 	}
 }
 
@@ -48,50 +50,75 @@ func draftsFolderFor(g *cmdutil.GlobalFlags, client *mail.IMAPClient) string {
 	return folder
 }
 
-func draftSave(g *cmdutil.GlobalFlags, args []string) error {
-	fs := flag.NewFlagSet("draft save", flag.ContinueOnError)
-	var toFlag, ccFlag, bccFlag, attachFlag helpers.StringSliceFlag
-	fs.Var(&toFlag, "to", "recipient (repeatable)")
-	fs.Var(&ccFlag, "cc", "CC recipient (repeatable)")
-	fs.Var(&bccFlag, "bcc", "BCC recipient (repeatable)")
-	fs.Var(&attachFlag, "attach", "attachment file path (repeatable)")
-	fromAddr := fs.String("from", "", "override From address (e.g. user+tag@domain)")
-	subject := fs.String("subject", "", "message subject")
-	bodies := helpers.RegisterBodyFlags(fs, "message body")
-	approval := fs.Bool("approval", false, "mark draft for approval ($PendingApproval keyword)")
-	if err := fs.Parse(args); err != nil {
-		return fmt.Errorf("usage: %w", err)
-	}
+// draftContent is the flag set that describes a draft's contents. `save` and
+// `update` compose the same message from the same flags and differ only in
+// what becomes of it, so they register them from one place.
+type draftContent struct {
+	to, cc, bcc, attach helpers.StringSliceFlag
+	from                *string
+	subject             *string
+	bodies              *helpers.BodyFlags
+	approval            *bool
+}
 
-	body, htmlBody, err := bodies.Read()
+func registerDraftContent(fs *flag.FlagSet) *draftContent {
+	d := &draftContent{}
+	fs.Var(&d.to, "to", "recipient (repeatable)")
+	fs.Var(&d.cc, "cc", "CC recipient (repeatable)")
+	fs.Var(&d.bcc, "bcc", "BCC recipient (repeatable)")
+	fs.Var(&d.attach, "attach", "attachment file path (repeatable)")
+	d.from = fs.String("from", "", "override From address (e.g. user+tag@domain)")
+	d.subject = fs.String("subject", "", "message subject")
+	d.bodies = helpers.RegisterBodyFlags(fs, "message body")
+	d.approval = fs.Bool("approval", false, "mark draft for approval ($PendingApproval keyword)")
+	return d
+}
+
+// options builds the message the flags describe. Call it after fs.Parse.
+func (d *draftContent) options(g *cmdutil.GlobalFlags) (mail.SendOptions, error) {
+	body, htmlBody, err := d.bodies.Read()
 	if err != nil {
-		return err
+		return mail.SendOptions{}, err
 	}
 
 	acct, err := helpers.ResolveAccount(g.Config, g.Account)
 	if err != nil {
-		return err
+		return mail.SendOptions{}, err
 	}
 
-	attachments, err := loadAttachments(attachFlag)
+	attachments, err := loadAttachments(d.attach)
 	if err != nil {
-		return err
+		return mail.SendOptions{}, err
 	}
 
 	from := mail.Address{Name: acct.DisplayName, Address: acct.Address}
-	if *fromAddr != "" {
-		from.Address = *fromAddr
+	if *d.from != "" {
+		from.Address = *d.from
 	}
 
-	opts := mail.SendOptions{
+	return mail.SendOptions{
 		From:        from,
-		To:          parseAddressFlags(toFlag),
-		Cc:          parseAddressFlags(ccFlag),
-		Bcc:         parseAddressFlags(bccFlag),
-		Subject:     *subject,
+		To:          parseAddressFlags(d.to),
+		Cc:          parseAddressFlags(d.cc),
+		Bcc:         parseAddressFlags(d.bcc),
+		Subject:     *d.subject,
 		TextBody:    body,
 		HTMLBody:    htmlBody,
 		Attachments: attachments,
+	}, nil
+}
+
+func draftSave(g *cmdutil.GlobalFlags, args []string) error {
+	fs := flag.NewFlagSet("draft save", flag.ContinueOnError)
+	content := registerDraftContent(fs)
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("usage: %w", err)
+	}
+	approval := content.approval
+
+	opts, err := content.options(g)
+	if err != nil {
+		return err
 	}
 
 	client, _, err := helpers.ConnectIMAP(g.Ctx, g.Config, g.Account, g.Logger)
@@ -102,7 +129,7 @@ func draftSave(g *cmdutil.GlobalFlags, args []string) error {
 
 	var keywords []string
 	if *approval {
-		keywords = append(keywords, "$PendingApproval")
+		keywords = append(keywords, mail.KeywordPendingApproval)
 	}
 
 	uid, err := mail.SaveDraft(g.Ctx, client, opts, keywords...)
@@ -123,6 +150,100 @@ func draftSave(g *cmdutil.GlobalFlags, args []string) error {
 		} else {
 			fmt.Fprintln(g.Out(), "Draft saved.")
 		}
+	}
+	return nil
+}
+
+// draftUpdate replaces a draft with a revised one. IMAP cannot alter a stored
+// message, so this is an append followed by a delete rather than an edit, and
+// the new draft gets a new UID.
+//
+// It takes the same flags as `save` and replaces the draft wholesale: what is
+// not given is not carried over. Merging would need a rule for every field
+// about what an absent flag means, and "the draft is what I just described" is
+// the one an agent revising its own text already has the material for.
+func draftUpdate(g *cmdutil.GlobalFlags, args []string) error {
+	fs := flag.NewFlagSet("draft update", flag.ContinueOnError)
+	content := registerDraftContent(fs)
+	args = helpers.ReorderArgs(args, map[string]bool{"approval": true})
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("usage: %w", err)
+	}
+
+	if fs.NArg() < 1 {
+		return fmt.Errorf("usage: draft update [options] <uid>")
+	}
+	uids, err := helpers.ParseUIDs(fs.Args()[:1])
+	if err != nil {
+		return err
+	}
+	old := uids[0]
+
+	opts, err := content.options(g)
+	if err != nil {
+		return err
+	}
+
+	client, _, err := helpers.ConnectIMAP(g.Ctx, g.Config, g.Account, g.Logger)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	folder := draftsFolderFor(g, client)
+
+	// Reading the old draft's flags settles two things before anything is
+	// written: that there is a draft at that UID to replace, and whether it
+	// was waiting on approval.
+	oldFlags, err := client.FetchFlags(g.Ctx, folder, old)
+	if err != nil {
+		return err
+	}
+
+	// A revision of a draft that was awaiting approval is still awaiting it.
+	// Dropping the keyword here would let a revision walk out of the queue
+	// that the original was put in.
+	pending := *content.approval || mail.HasKeyword(oldFlags, mail.KeywordPendingApproval)
+
+	var keywords []string
+	if pending {
+		keywords = append(keywords, mail.KeywordPendingApproval)
+	}
+
+	uid, err := mail.SaveDraft(g.Ctx, client, opts, keywords...)
+	if err != nil {
+		return err
+	}
+
+	// The revision is saved by this point. A failure to remove what it
+	// replaced leaves two drafts, which is worth reporting but is not worth
+	// failing over: retrying would append a third.
+	var warnings []string
+	if err := client.DeleteMessage(g.Ctx, folder, old); err != nil {
+		warnings = append(warnings,
+			fmt.Sprintf("the revision was saved as uid %d, but draft %d is still in %s: %v",
+				uid, old, folder, err))
+	}
+
+	status := "updated"
+	if pending {
+		status = "pending_approval"
+	}
+
+	if g.JSON {
+		result := map[string]any{"status": status, "uid": uid, "previousUid": old}
+		if len(warnings) > 0 {
+			result["warnings"] = warnings
+		}
+		return output.PrintJSON(g.Out(), result)
+	}
+
+	fmt.Fprintf(g.Out(), "Draft %d replaced by %d.\n", old, uid)
+	if pending {
+		fmt.Fprintln(g.Out(), "It is marked for approval.")
+	}
+	for _, w := range warnings {
+		fmt.Fprintln(g.Err(), "warning:", w)
 	}
 	return nil
 }

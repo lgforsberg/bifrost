@@ -6,6 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-08-02
+
+### Added
+
+- `draft update <uid>`: replace a draft with a revised one in a single
+  command, rather than save-new-then-delete-old by hand. IMAP cannot alter a
+  stored message, so the revision gets a new UID, reported alongside the old
+  one as `previousUid`.
+
+  A draft awaiting approval stays that way when revised, so a revision cannot
+  walk out of the queue the original was put in.
+
 ## [1.21.0] - 2026-08-02
 
 ### Added
@@ -500,7 +512,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.21.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.22.0...HEAD
+[1.22.0]: https://github.com/lgforsberg/bifrost/compare/v1.21.0...v1.22.0
 [1.21.0]: https://github.com/lgforsberg/bifrost/compare/v1.20.0...v1.21.0
 [1.20.0]: https://github.com/lgforsberg/bifrost/compare/v1.19.0...v1.20.0
 [1.19.0]: https://github.com/lgforsberg/bifrost/compare/v1.18.0...v1.19.0

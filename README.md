@@ -196,7 +196,7 @@ Without `--json`, errors print to stderr as `error: <message>`.
 | `flag` / `unflag` | Set or clear the `\Flagged` marker |
 | `folder` | Manage folders (list, status, create, rename, delete) |
 | `accounts` | List configured accounts |
-| `draft` | Manage drafts (save, list, send, delete) |
+| `draft` | Manage drafts (save, update, list, send, approve, delete) |
 | `config` | Configuration management (init) |
 | `version` / `help` | Version and usage |
 
@@ -470,6 +470,7 @@ JSON output: `[{"address": "...", "displayName": "...", "default": true, "imapHo
 bifrost draft save [--to ADDR...] [--cc ADDR...] [--bcc ADDR...] [--subject TEXT]
                    [--from ADDR] [--approval] [--body TEXT | --body-file PATH]
                    [--body-html TEXT | --body-html-file PATH] [--attach PATH...]
+bifrost draft update [same options as save] <uid>
 bifrost draft list [--limit N] [--offset N]
 bifrost draft send [--force] [--no-save] <uid>
 bifrost draft approve <uid>
@@ -477,6 +478,19 @@ bifrost draft delete [--permanent] <uid>
 ```
 
 `save` returns the server-assigned UID (via UIDPLUS). `--approval` tags the draft with the `$PendingApproval` IMAP keyword.
+
+**Revising a draft.** `update` takes the same options as `save` plus the UID of the draft to replace:
+
+```bash
+uid=$(bifrost --json draft save --to bob@example.com --subject "Q3" --body "Rough" | jq -r .uid)
+uid=$(bifrost --json draft update --to bob@example.com --subject "Q3" --body "Polished" "$uid" | jq -r .uid)
+```
+
+IMAP cannot alter a stored message, so this appends the revision and deletes what it replaced. The draft therefore gets a **new UID**, which the result reports alongside the old one as `{"status": "updated", "uid": 44, "previousUid": 43}`. Loop on the returned UID, as above, rather than reusing the original.
+
+The replacement is wholesale: what you do not pass is not carried over from the old draft. A draft awaiting approval stays that way, so a revision cannot walk out of the queue the original was put in.
+
+If the revision saves but the old draft cannot be removed, you get both, reported in `warnings` with the status still `updated`. Retrying would append a third copy, so it is not treated as a failure.
 
 **The approval workflow.** A draft saved with `--approval` will not be sent. `draft send` refuses it with the `PENDING_APPROVAL` error code and exit 1, and says so without sending anything:
 

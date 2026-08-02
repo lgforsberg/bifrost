@@ -1155,3 +1155,132 @@ func TestSearch_MissingFolderIsReportedAsNotFound(t *testing.T) {
 		t.Errorf("error = %v, want mail.ErrNotFound", err)
 	}
 }
+
+// A revision loop used to be save-new-then-delete-old by hand, with nothing
+// tying the two together.
+func TestDraft_Update(t *testing.T) {
+	cli := newTestCLI(t)
+
+	if err := Draft(cli.g, []string{"save", "--to", "bob@example.com",
+		"--subject", "First try", "--body", "Rough"}); err != nil {
+		t.Fatalf("draft save: %v", err)
+	}
+	old := fmt.Sprint(int(cli.decodeObject(t)["uid"].(float64)))
+
+	cli.out.Reset()
+	err := Draft(cli.g, []string{"update", "--to", "bob@example.com",
+		"--subject", "Second try", "--body", "Polished", old})
+	if err != nil {
+		t.Fatalf("draft update: %v", err)
+	}
+	updated := cli.decodeObject(t)
+
+	if updated["status"] != "updated" {
+		t.Errorf("status = %v, want updated", updated["status"])
+	}
+	if fmt.Sprint(int(updated["previousUid"].(float64))) != old {
+		t.Errorf("previousUid = %v, want %s", updated["previousUid"], old)
+	}
+	if _, ok := updated["warnings"]; ok {
+		t.Errorf("unexpected warnings: %v", updated["warnings"])
+	}
+
+	// One draft, the revised one. The superseded copy is gone rather than
+	// left alongside it.
+	cli.out.Reset()
+	if err := Draft(cli.g, []string{"list"}); err != nil {
+		t.Fatalf("draft list: %v", err)
+	}
+	drafts := cli.decodeArray(t)
+	if len(drafts) != 1 {
+		t.Fatalf("Drafts holds %d messages, want only the revision: %v", len(drafts), drafts)
+	}
+	if drafts[0]["subject"] != "Second try" {
+		t.Errorf("subject = %v, want the revision", drafts[0]["subject"])
+	}
+}
+
+// A revision of a draft that was awaiting approval is still awaiting it, or
+// the revision walks out of the queue the original was put in.
+func TestDraft_UpdateKeepsPendingApproval(t *testing.T) {
+	cli := newTestCLI(t)
+
+	if err := Draft(cli.g, []string{"save", "--approval", "--to", "boss@example.com",
+		"--subject", "Q3", "--body", "Draft one"}); err != nil {
+		t.Fatalf("draft save --approval: %v", err)
+	}
+	old := fmt.Sprint(int(cli.decodeObject(t)["uid"].(float64)))
+
+	cli.out.Reset()
+	err := Draft(cli.g, []string{"update", "--to", "boss@example.com",
+		"--subject", "Q3", "--body", "Draft two", old})
+	if err != nil {
+		t.Fatalf("draft update: %v", err)
+	}
+	updated := cli.decodeObject(t)
+	if updated["status"] != "pending_approval" {
+		t.Errorf("status = %v, want pending_approval", updated["status"])
+	}
+	uid := fmt.Sprint(int(updated["uid"].(float64)))
+
+	// The keyword is really on the message, not just in the report.
+	cli.out.Reset()
+	if err := Search(cli.g, []string{"--folder", "Drafts", "--keyword", "$PendingApproval"}); err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	waiting := cli.decodeArray(t)
+	if len(waiting) != 1 {
+		t.Fatalf("%d drafts awaiting approval, want the revision alone: %v", len(waiting), waiting)
+	}
+	if fmt.Sprint(int(waiting[0]["uid"].(float64))) != uid {
+		t.Errorf("the draft awaiting approval is %v, want the revision %s", waiting[0]["uid"], uid)
+	}
+
+	// And it still refuses to send without approval.
+	cli.out.Reset()
+	if err := Draft(cli.g, []string{"send", uid}); !errors.Is(err, mail.ErrPendingApproval) {
+		t.Errorf("draft send error = %v, want ErrPendingApproval", err)
+	}
+}
+
+// A draft that was not in the approval workflow does not join it by being
+// revised.
+func TestDraft_UpdateDoesNotInventApproval(t *testing.T) {
+	cli := newTestCLI(t)
+
+	if err := Draft(cli.g, []string{"save", "--to", "bob@example.com",
+		"--subject", "Ordinary", "--body", "One"}); err != nil {
+		t.Fatalf("draft save: %v", err)
+	}
+	old := fmt.Sprint(int(cli.decodeObject(t)["uid"].(float64)))
+
+	cli.out.Reset()
+	err := Draft(cli.g, []string{"update", "--to", "bob@example.com",
+		"--subject", "Ordinary", "--body", "Two", old})
+	if err != nil {
+		t.Fatalf("draft update: %v", err)
+	}
+	if status := cli.decodeObject(t)["status"]; status != "updated" {
+		t.Errorf("status = %v, want updated", status)
+	}
+}
+
+func TestDraft_UpdateRequiresAnExistingDraft(t *testing.T) {
+	cli := newTestCLI(t)
+	cli.seed(t, "Drafts", "something so the folder exists")
+
+	err := Draft(cli.g, []string{"update", "--to", "bob@example.com",
+		"--subject", "x", "--body", "y", "9999"})
+	if !errors.Is(err, mail.ErrNotFound) {
+		t.Errorf("error = %v, want mail.ErrNotFound", err)
+	}
+}
+
+func TestDraft_UpdateNeedsAUID(t *testing.T) {
+	cli := newTestCLI(t)
+
+	err := Draft(cli.g, []string{"update", "--to", "bob@example.com", "--subject", "x", "--body", "y"})
+	if err == nil || !strings.HasPrefix(err.Error(), "usage:") {
+		t.Errorf("error = %v, want a usage error", err)
+	}
+}
