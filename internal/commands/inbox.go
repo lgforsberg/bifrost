@@ -3,7 +3,6 @@ package commands
 import (
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
 	"github.com/lgforsberg/bifrost/internal/helpers"
@@ -31,11 +30,11 @@ func Inbox(g *cmdutil.GlobalFlags, args []string) error {
 	}
 
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, envelopes)
+		return output.PrintJSON(g.Out(), envelopes)
 	}
 
 	if len(envelopes) == 0 {
-		fmt.Println("No messages.")
+		fmt.Fprintln(g.Out(), "No messages.")
 		return nil
 	}
 
@@ -71,7 +70,7 @@ func Inbox(g *cmdutil.GlobalFlags, args []string) error {
 			subject,
 		}
 	}
-	output.PrintTable(os.Stdout, headers, rows)
+	output.PrintTable(g.Out(), headers, rows)
 	return nil
 }
 

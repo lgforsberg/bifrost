@@ -3,7 +3,6 @@ package commands
 import (
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
 	"github.com/lgforsberg/bifrost/internal/helpers"
@@ -44,9 +43,9 @@ func Archive(g *cmdutil.GlobalFlags, args []string) error {
 	}
 
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, bulkResult("archived", v))
+		return output.PrintJSON(g.Out(), bulkResult("archived", v))
 	} else {
-		fmt.Printf("Archived %d message(s).\n", len(v.Existing))
+		fmt.Fprintf(g.Out(), "Archived %d message(s).\n", len(v.Existing))
 	}
 	return nil
 }

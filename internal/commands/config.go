@@ -61,9 +61,9 @@ func configInit(g *cmdutil.GlobalFlags, args []string) error {
 	}
 
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, map[string]string{"status": "created", "path": cfgPath})
+		return output.PrintJSON(g.Out(), map[string]string{"status": "created", "path": cfgPath})
 	} else {
-		fmt.Printf("Config created at %s\nEdit it with your account details.\n", cfgPath)
+		fmt.Fprintf(g.Out(), "Config created at %s\nEdit it with your account details.\n", cfgPath)
 	}
 	return nil
 }

@@ -94,8 +94,7 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
         That covers T-006's second warning path
   - [x] special-use attributes over the wire, via the same wrapper replacing what LIST reports.
         A decoy mailbox named Archive loses to the one advertising `\Archive`
-  - [ ] golden-file tests for each command's JSON output and error codes. Blocked on T-024:
-        commands print straight to `os.Stdout`, so there is nothing to capture
+  - [ ] golden-file tests for each command's JSON output and error codes. Unblocked by T-024
   - [x] `internal/commands` has a test file at all (T-036 added the first four)
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-02 · ref `mail/imapserver_test.go`
   ↳ took `mail` from 42.9% to 80.0%, and caught T-037 on the first run
@@ -138,9 +137,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 - **T-023** `draft update <uid>`: append the revised draft and delete the old one in a single
   command so agent revision loops are not save-new-then-delete-old by hand.
   ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `internal/commands/draft.go`
-- **T-024** Make the command layer testable: thread an `io.Writer` through `GlobalFlags` instead
-  of printing to `os.Stdout` directly, then add command unit tests. Feeds T-013.
-  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `internal/cmdutil/cmdutil.go`
 - **T-025** `FetchThread` rework: iterative reference expansion (current single hop misses
   distant thread members), envelope-only discovery instead of full-body fetches, and
   `slices.SortFunc` over the hand-rolled insertion sort.
@@ -178,6 +174,13 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-024** Command output goes through `GlobalFlags.Out()` and `Err()` rather than the process
+  streams, and `classifyError` is split out of `handleError` so the code and exit status can be
+  checked without the `os.Exit`. The accessors fall back to the real streams when unset, so
+  nothing outside tests had to change.
+  ↳ done 2026-08-02 · evidence: 64 call sites across 13 files, verified by diffing the string
+  literals on both sides of the change (only the 11 now-unused `os` imports differ) and by
+  counting streams: 63 to stdout and 1 to stderr, before and after.
 - **T-037** `archive`, `delete` and `draft save` create a configured folder that is not there
   yet. Only the fallback path called `EnsureFolder`, so the overrides added in T-010 broke all
   three on any server that did not already have the folder. `resolveOrCreate` in

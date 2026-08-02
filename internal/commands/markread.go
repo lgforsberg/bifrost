@@ -3,7 +3,6 @@ package commands
 import (
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
 	"github.com/lgforsberg/bifrost/internal/helpers"
@@ -43,9 +42,9 @@ func MarkRead(g *cmdutil.GlobalFlags, args []string) error {
 	}
 
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, bulkResult("marked_read", v))
+		return output.PrintJSON(g.Out(), bulkResult("marked_read", v))
 	} else {
-		fmt.Printf("Marked %d message(s) as read.\n", len(v.Existing))
+		fmt.Fprintf(g.Out(), "Marked %d message(s) as read.\n", len(v.Existing))
 	}
 	return nil
 }
@@ -83,9 +82,9 @@ func MarkUnread(g *cmdutil.GlobalFlags, args []string) error {
 	}
 
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, bulkResult("marked_unread", v))
+		return output.PrintJSON(g.Out(), bulkResult("marked_unread", v))
 	} else {
-		fmt.Printf("Marked %d message(s) as unread.\n", len(v.Existing))
+		fmt.Fprintf(g.Out(), "Marked %d message(s) as unread.\n", len(v.Existing))
 	}
 	return nil
 }

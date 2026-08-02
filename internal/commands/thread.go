@@ -3,7 +3,6 @@ package commands
 import (
 	"flag"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
@@ -61,21 +60,21 @@ func Thread(g *cmdutil.GlobalFlags, args []string) error {
 	}
 
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, messages)
+		return output.PrintJSON(g.Out(), messages)
 	}
 
 	for i, msg := range messages {
 		if i > 0 {
-			fmt.Println("---")
+			fmt.Fprintln(g.Out(), "---")
 		}
-		fmt.Printf("UID:     %d\n", msg.UID)
+		fmt.Fprintf(g.Out(), "UID:     %d\n", msg.UID)
 		if msg.Folder != "" {
-			fmt.Printf("Folder:  %s\n", msg.Folder)
+			fmt.Fprintf(g.Out(), "Folder:  %s\n", msg.Folder)
 		}
-		fmt.Printf("From:    %s\n", msg.From.String())
-		fmt.Printf("Date:    %s\n", msg.Date.Format("Mon, 02 Jan 2006 15:04:05 -0700"))
-		fmt.Printf("Subject: %s\n\n", msg.Subject)
-		fmt.Println(msg.TextBody)
+		fmt.Fprintf(g.Out(), "From:    %s\n", msg.From.String())
+		fmt.Fprintf(g.Out(), "Date:    %s\n", msg.Date.Format("Mon, 02 Jan 2006 15:04:05 -0700"))
+		fmt.Fprintf(g.Out(), "Subject: %s\n\n", msg.Subject)
+		fmt.Fprintln(g.Out(), msg.TextBody)
 	}
 	return nil
 }

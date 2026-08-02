@@ -137,8 +137,26 @@ func parseGlobalFlags(args []string) (cmdutil.GlobalFlags, []string) {
 }
 
 func handleError(g *cmdutil.GlobalFlags, err error) {
-	code := "UNKNOWN"
-	exitCode := 1
+	code, exitCode, err := classifyError(g, err)
+
+	if g.JSON {
+		_ = output.PrintJSON(g.Out(), mail.ErrorResponse{
+			Error:   true,
+			Code:    code,
+			Message: err.Error(),
+		})
+	} else {
+		fmt.Fprintf(g.Err(), "error: %v\n", err)
+	}
+	os.Exit(exitCode)
+}
+
+// classifyError maps an error to the code and exit status the CLI reports for
+// it, and to the error it describes, which an interrupt rewrites. Separate
+// from handleError so it can be tested without the os.Exit.
+func classifyError(g *cmdutil.GlobalFlags, err error) (code string, exitCode int, reported error) {
+	code = "UNKNOWN"
+	exitCode = 1
 
 	switch {
 	case errors.Is(err, mail.ErrNotFound):
@@ -169,16 +187,7 @@ func handleError(g *cmdutil.GlobalFlags, err error) {
 		exitCode = 2
 	}
 
-	if g.JSON {
-		_ = output.PrintJSON(os.Stdout, mail.ErrorResponse{
-			Error:   true,
-			Code:    code,
-			Message: err.Error(),
-		})
-	} else {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-	}
-	os.Exit(exitCode)
+	return code, exitCode, err
 }
 
 func printUsage() {

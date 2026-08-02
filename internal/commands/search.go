@@ -3,7 +3,6 @@ package commands
 import (
 	"flag"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
@@ -71,11 +70,11 @@ func Search(g *cmdutil.GlobalFlags, args []string) error {
 	}
 
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, envelopes)
+		return output.PrintJSON(g.Out(), envelopes)
 	}
 
 	if len(envelopes) == 0 {
-		fmt.Println("No matching messages.")
+		fmt.Fprintln(g.Out(), "No matching messages.")
 		return nil
 	}
 
@@ -105,6 +104,6 @@ func Search(g *cmdutil.GlobalFlags, args []string) error {
 			truncate(env.Subject, 60),
 		}
 	}
-	output.PrintTable(os.Stdout, headers, rows)
+	output.PrintTable(g.Out(), headers, rows)
 	return nil
 }

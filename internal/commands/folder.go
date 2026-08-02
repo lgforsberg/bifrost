@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
 	"github.com/lgforsberg/bifrost/internal/helpers"
@@ -55,7 +54,7 @@ func folderList(g *cmdutil.GlobalFlags) error {
 	}
 
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, folders)
+		return output.PrintJSON(g.Out(), folders)
 	}
 
 	for _, f := range folders {
@@ -70,7 +69,7 @@ func folderList(g *cmdutil.GlobalFlags) error {
 			}
 			attrs += ")"
 		}
-		fmt.Printf("%s%s\n", f.Name, attrs)
+		fmt.Fprintf(g.Out(), "%s%s\n", f.Name, attrs)
 	}
 	return nil
 }
@@ -87,9 +86,9 @@ func folderCreate(g *cmdutil.GlobalFlags, name string) error {
 	}
 
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, map[string]string{"status": "created", "name": name})
+		return output.PrintJSON(g.Out(), map[string]string{"status": "created", "name": name})
 	} else {
-		fmt.Printf("Folder %q created.\n", name)
+		fmt.Fprintf(g.Out(), "Folder %q created.\n", name)
 	}
 	return nil
 }
@@ -106,9 +105,9 @@ func folderRename(g *cmdutil.GlobalFlags, old, newName string) error {
 	}
 
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, map[string]string{"status": "renamed", "old": old, "new": newName})
+		return output.PrintJSON(g.Out(), map[string]string{"status": "renamed", "old": old, "new": newName})
 	} else {
-		fmt.Printf("Folder %q renamed to %q.\n", old, newName)
+		fmt.Fprintf(g.Out(), "Folder %q renamed to %q.\n", old, newName)
 	}
 	return nil
 }
@@ -125,9 +124,9 @@ func folderDelete(g *cmdutil.GlobalFlags, name string) error {
 	}
 
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, map[string]string{"status": "deleted", "name": name})
+		return output.PrintJSON(g.Out(), map[string]string{"status": "deleted", "name": name})
 	} else {
-		fmt.Printf("Folder %q deleted.\n", name)
+		fmt.Fprintf(g.Out(), "Folder %q deleted.\n", name)
 	}
 	return nil
 }

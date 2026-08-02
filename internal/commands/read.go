@@ -3,7 +3,6 @@ package commands
 import (
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
 	"github.com/lgforsberg/bifrost/internal/helpers"
@@ -67,37 +66,37 @@ func Read(g *cmdutil.GlobalFlags, args []string) error {
 	}
 
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, msg)
+		return output.PrintJSON(g.Out(), msg)
 	}
 
-	fmt.Printf("UID:     %d\n", msg.UID)
-	fmt.Printf("From:    %s\n", msg.From.String())
+	fmt.Fprintf(g.Out(), "UID:     %d\n", msg.UID)
+	fmt.Fprintf(g.Out(), "From:    %s\n", msg.From.String())
 	if len(msg.ReplyTo) > 0 {
-		fmt.Printf("Reply-To: %s\n", formatAddresses(msg.ReplyTo))
+		fmt.Fprintf(g.Out(), "Reply-To: %s\n", formatAddresses(msg.ReplyTo))
 	}
-	fmt.Printf("To:      %s\n", formatAddresses(msg.To))
+	fmt.Fprintf(g.Out(), "To:      %s\n", formatAddresses(msg.To))
 	if len(msg.Cc) > 0 {
-		fmt.Printf("Cc:      %s\n", formatAddresses(msg.Cc))
+		fmt.Fprintf(g.Out(), "Cc:      %s\n", formatAddresses(msg.Cc))
 	}
 	// Only ever set on a draft or a Sent copy, where the sender needs to see
 	// who was blind-copied.
 	if len(msg.Bcc) > 0 {
-		fmt.Printf("Bcc:     %s\n", formatAddresses(msg.Bcc))
+		fmt.Fprintf(g.Out(), "Bcc:     %s\n", formatAddresses(msg.Bcc))
 	}
-	fmt.Printf("Date:    %s\n", msg.Date.Format("Mon, 02 Jan 2006 15:04:05 -0700"))
-	fmt.Printf("Subject: %s\n", msg.Subject)
+	fmt.Fprintf(g.Out(), "Date:    %s\n", msg.Date.Format("Mon, 02 Jan 2006 15:04:05 -0700"))
+	fmt.Fprintf(g.Out(), "Subject: %s\n", msg.Subject)
 	if len(msg.Attachments) > 0 {
-		fmt.Printf("Attachments: ")
+		fmt.Fprintf(g.Out(), "Attachments: ")
 		for i, att := range msg.Attachments {
 			if i > 0 {
-				fmt.Print(", ")
+				fmt.Fprint(g.Out(), ", ")
 			}
-			fmt.Printf("%s (%s, %d bytes)", att.Filename, att.ContentType, att.Size)
+			fmt.Fprintf(g.Out(), "%s (%s, %d bytes)", att.Filename, att.ContentType, att.Size)
 		}
-		fmt.Println()
+		fmt.Fprintln(g.Out())
 	}
-	fmt.Println()
-	fmt.Println(msg.TextBody)
+	fmt.Fprintln(g.Out())
+	fmt.Fprintln(g.Out(), msg.TextBody)
 	return nil
 }
 

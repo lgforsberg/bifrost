@@ -3,7 +3,6 @@ package commands
 import (
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
 	"github.com/lgforsberg/bifrost/internal/helpers"
@@ -54,9 +53,9 @@ func Move(g *cmdutil.GlobalFlags, args []string) error {
 	if g.JSON {
 		result := bulkResult("moved", v)
 		result["to"] = *toFolder
-		return output.PrintJSON(os.Stdout, result)
+		return output.PrintJSON(g.Out(), result)
 	} else {
-		fmt.Printf("Moved %d message(s) to %s.\n", len(v.Existing), *toFolder)
+		fmt.Fprintf(g.Out(), "Moved %d message(s) to %s.\n", len(v.Existing), *toFolder)
 	}
 	return nil
 }

@@ -3,7 +3,6 @@ package commands
 import (
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
 	"github.com/lgforsberg/bifrost/internal/helpers"
@@ -109,12 +108,12 @@ func draftSave(g *cmdutil.GlobalFlags, args []string) error {
 	}
 
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, map[string]any{"status": status, "uid": uid})
+		return output.PrintJSON(g.Out(), map[string]any{"status": status, "uid": uid})
 	} else {
 		if *approval {
-			fmt.Println("Draft saved and marked for approval.")
+			fmt.Fprintln(g.Out(), "Draft saved and marked for approval.")
 		} else {
-			fmt.Println("Draft saved.")
+			fmt.Fprintln(g.Out(), "Draft saved.")
 		}
 	}
 	return nil
@@ -145,11 +144,11 @@ func draftList(g *cmdutil.GlobalFlags, args []string) error {
 	}
 
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, envelopes)
+		return output.PrintJSON(g.Out(), envelopes)
 	}
 
 	if len(envelopes) == 0 {
-		fmt.Println("No drafts.")
+		fmt.Fprintln(g.Out(), "No drafts.")
 		return nil
 	}
 
@@ -167,7 +166,7 @@ func draftList(g *cmdutil.GlobalFlags, args []string) error {
 			truncate(env.Subject, 50),
 		}
 	}
-	output.PrintTable(os.Stdout, headers, rows)
+	output.PrintTable(g.Out(), headers, rows)
 	return nil
 }
 
@@ -247,13 +246,13 @@ func draftDelete(g *cmdutil.GlobalFlags, args []string) error {
 		if !gone {
 			result["movedTo"] = movedTo
 		}
-		return output.PrintJSON(os.Stdout, result)
+		return output.PrintJSON(g.Out(), result)
 	}
 
 	if gone {
-		fmt.Println("Draft permanently deleted.")
+		fmt.Fprintln(g.Out(), "Draft permanently deleted.")
 	} else {
-		fmt.Printf("Draft moved to %s.\n", movedTo)
+		fmt.Fprintf(g.Out(), "Draft moved to %s.\n", movedTo)
 	}
 	return nil
 }

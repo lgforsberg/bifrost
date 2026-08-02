@@ -3,7 +3,6 @@ package commands
 import (
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
 	"github.com/lgforsberg/bifrost/internal/helpers"
@@ -59,13 +58,13 @@ func Delete(g *cmdutil.GlobalFlags, args []string) error {
 		if !gone {
 			result["movedTo"] = movedTo
 		}
-		return output.PrintJSON(os.Stdout, result)
+		return output.PrintJSON(g.Out(), result)
 	}
 
 	if gone {
-		fmt.Printf("Permanently deleted %d message(s).\n", len(v.Existing))
+		fmt.Fprintf(g.Out(), "Permanently deleted %d message(s).\n", len(v.Existing))
 	} else {
-		fmt.Printf("Moved %d message(s) to %s.\n", len(v.Existing), movedTo)
+		fmt.Fprintf(g.Out(), "Moved %d message(s) to %s.\n", len(v.Existing), movedTo)
 	}
 	return nil
 }

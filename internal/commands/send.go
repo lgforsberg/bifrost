@@ -99,7 +99,7 @@ type sendResponse struct {
 // mode warnings go to stderr, keeping stdout usable in a pipeline.
 func reportSend(g *cmdutil.GlobalFlags, res mail.SendResult, humanMsg string) error {
 	if g.JSON {
-		return output.PrintJSON(os.Stdout, sendResponse{
+		return output.PrintJSON(g.Out(), sendResponse{
 			Status:    "sent",
 			MessageID: res.MessageID,
 			Warnings:  res.Warnings,
@@ -107,9 +107,9 @@ func reportSend(g *cmdutil.GlobalFlags, res mail.SendResult, humanMsg string) er
 	}
 
 	for _, w := range res.Warnings {
-		fmt.Fprintf(os.Stderr, "warning: %s\n", w)
+		fmt.Fprintf(g.Err(), "warning: %s\n", w)
 	}
-	fmt.Println(humanMsg)
+	fmt.Fprintln(g.Out(), humanMsg)
 	return nil
 }
 

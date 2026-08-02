@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
 	"github.com/lgforsberg/bifrost/internal/config"
@@ -29,7 +28,7 @@ func Accounts(g *cmdutil.GlobalFlags, args []string) error {
 				SMTPHost:    a.SMTPHost,
 			}
 		}
-		return output.PrintJSON(os.Stdout, accounts)
+		return output.PrintJSON(g.Out(), accounts)
 	}
 
 	headers := []string{"ADDRESS", "NAME", "IMAP", "SMTP"}
@@ -46,6 +45,6 @@ func Accounts(g *cmdutil.GlobalFlags, args []string) error {
 			fmt.Sprintf("%s:%d", a.SMTPHost, a.SMTPPort),
 		}
 	}
-	output.PrintTable(os.Stdout, headers, rows)
+	output.PrintTable(g.Out(), headers, rows)
 	return nil
 }
