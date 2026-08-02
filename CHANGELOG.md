@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.24.1] - 2026-08-02
+
+### Fixed
+
+- An attachment or body part whose transfer encoding has no decoder is now
+  kept as raw bytes with a warning, the same as when the encoding labels the
+  whole message. Nested in a multipart it was dropped: the MIME reader
+  returned nothing for the part, discarding an entity that held the bytes, so
+  a file was reported missing rather than undecoded. Parts are now walked one
+  layer down, where the bytes survive.
+
 ## [1.24.0] - 2026-08-02
 
 ### Fixed
@@ -547,7 +558,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.24.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.24.1...HEAD
+[1.24.1]: https://github.com/lgforsberg/bifrost/compare/v1.24.0...v1.24.1
 [1.24.0]: https://github.com/lgforsberg/bifrost/compare/v1.23.0...v1.24.0
 [1.23.0]: https://github.com/lgforsberg/bifrost/compare/v1.22.0...v1.23.0
 [1.22.0]: https://github.com/lgforsberg/bifrost/compare/v1.21.0...v1.22.0

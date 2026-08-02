@@ -516,9 +516,7 @@ func TestParseMessage_CleanMessageWarnsAboutNothing(t *testing.T) {
 	}
 }
 
-// One bad part inside a multipart must not cost the others. The reader will
-// not hand this part over at all (see T-041), so its content is genuinely
-// lost, but the walk carries on and the loss is named rather than silent.
+// One bad part inside a multipart must not cost the others.
 func TestParseMessage_OneBadPartDoesNotCostTheRest(t *testing.T) {
 	raw := "From: sender@example.com\r\n" +
 		"Subject: Mixed\r\n" +
@@ -553,6 +551,143 @@ func TestParseMessage_OneBadPartDoesNotCostTheRest(t *testing.T) {
 		t.Errorf("got %d attachments, want the one that follows the bad part", len(msg.Attachments))
 	}
 	if len(msg.Warnings) == 0 {
-		t.Error("the skipped part must be named, or it is silent data loss")
+		t.Error("the undecodable part must be named, or it is silent data loss")
+	}
+}
+
+// An attachment whose transfer encoding has no decoder used to vanish. The
+// whole-message case was handled, but inside a multipart the mail reader
+// returned nothing at all for the part, dropping an entity that held the raw
+// bytes, so the file was reported missing rather than undecoded.
+func TestParseMessage_KeepsAnAttachmentWithNoDecoder(t *testing.T) {
+	raw := "From: sender@example.com\r\n" +
+		"Subject: Odd encoding\r\n" +
+		"Content-Type: multipart/mixed; boundary=BOUND\r\n" +
+		"\r\n" +
+		"--BOUND\r\n" +
+		"Content-Type: text/plain\r\n" +
+		"\r\n" +
+		"See attached.\r\n" +
+		"--BOUND\r\n" +
+		"Content-Type: application/octet-stream\r\n" +
+		"Content-Transfer-Encoding: x-uuencode\r\n" +
+		"Content-Disposition: attachment; filename=\"report.bin\"\r\n" +
+		"\r\n" +
+		"RAWPAYLOAD\r\n" +
+		"--BOUND--\r\n"
+
+	msg, err := ParseMessage(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseMessage: %v", err)
+	}
+	if len(msg.Attachments) != 1 {
+		t.Fatalf("got %d attachments, want the undecodable one kept", len(msg.Attachments))
+	}
+
+	att := msg.Attachments[0]
+	if att.Filename != "report.bin" {
+		t.Errorf("Filename = %q, want report.bin", att.Filename)
+	}
+	if !strings.Contains(string(att.Data), "RAWPAYLOAD") {
+		t.Errorf("Data = %q, want the undecoded bytes", att.Data)
+	}
+	if len(msg.Warnings) == 0 {
+		t.Error("undecoded bytes must be flagged, or they look like a clean read")
+	}
+}
+
+// The same for body text, where the loss was an empty message rather than a
+// missing file.
+func TestParseMessage_KeepsBodyTextWithNoDecoder(t *testing.T) {
+	raw := "From: sender@example.com\r\n" +
+		"Subject: Odd encoding\r\n" +
+		"Content-Type: multipart/mixed; boundary=BOUND\r\n" +
+		"\r\n" +
+		"--BOUND\r\n" +
+		"Content-Type: text/plain\r\n" +
+		"Content-Transfer-Encoding: x-uuencode\r\n" +
+		"\r\n" +
+		"the only words in this message\r\n" +
+		"--BOUND--\r\n"
+
+	msg, err := ParseMessage(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseMessage: %v", err)
+	}
+	if !strings.Contains(msg.TextBody, "the only words in this message") {
+		t.Errorf("TextBody = %q, want the undecoded text", msg.TextBody)
+	}
+	if len(msg.Warnings) == 0 {
+		t.Error("undecoded text must be flagged")
+	}
+}
+
+// Nesting is walked, and a part is placed by its disposition rather than by
+// how deep it sits.
+func TestParseMessage_WalksNestedMultiparts(t *testing.T) {
+	raw := "From: sender@example.com\r\n" +
+		"Subject: Nested\r\n" +
+		"Content-Type: multipart/mixed; boundary=OUTER\r\n" +
+		"\r\n" +
+		"--OUTER\r\n" +
+		"Content-Type: multipart/alternative; boundary=INNER\r\n" +
+		"\r\n" +
+		"--INNER\r\n" +
+		"Content-Type: text/plain\r\n" +
+		"\r\n" +
+		"plain words\r\n" +
+		"--INNER\r\n" +
+		"Content-Type: text/html\r\n" +
+		"\r\n" +
+		"<p>rich words</p>\r\n" +
+		"--INNER--\r\n" +
+		"--OUTER\r\n" +
+		"Content-Type: text/csv\r\n" +
+		"Content-Disposition: attachment; filename=\"rows.csv\"\r\n" +
+		"\r\n" +
+		"a,b\r\n" +
+		"--OUTER--\r\n"
+
+	msg, err := ParseMessage(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseMessage: %v", err)
+	}
+	if !strings.Contains(msg.TextBody, "plain words") {
+		t.Errorf("TextBody = %q, want the nested plain part", msg.TextBody)
+	}
+	if !strings.Contains(msg.HTMLBody, "rich words") {
+		t.Errorf("HTMLBody = %q, want the nested html part", msg.HTMLBody)
+	}
+	// text/csv is text, so only the disposition keeps it out of the body.
+	if len(msg.Attachments) != 1 || msg.Attachments[0].Filename != "rows.csv" {
+		t.Errorf("attachments = %+v, want rows.csv alone", msg.Attachments)
+	}
+	if len(msg.Warnings) != 0 {
+		t.Errorf("Warnings = %v, want none for a well-formed message", msg.Warnings)
+	}
+}
+
+// A name on the content type rather than the disposition, which RFC 2183
+// discourages and plenty of mail sends anyway.
+func TestParseMessage_AttachmentNamedOnTheContentType(t *testing.T) {
+	raw := "From: sender@example.com\r\n" +
+		"Subject: Named oddly\r\n" +
+		"Content-Type: multipart/mixed; boundary=BOUND\r\n" +
+		"\r\n" +
+		"--BOUND\r\n" +
+		"Content-Type: application/pdf; name=\"invoice.pdf\"\r\n" +
+		"\r\n" +
+		"PDFBYTES\r\n" +
+		"--BOUND--\r\n"
+
+	msg, err := ParseMessage(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseMessage: %v", err)
+	}
+	if len(msg.Attachments) != 1 {
+		t.Fatalf("got %d attachments, want 1", len(msg.Attachments))
+	}
+	if msg.Attachments[0].Filename != "invoice.pdf" {
+		t.Errorf("Filename = %q, want invoice.pdf", msg.Attachments[0].Filename)
 	}
 }

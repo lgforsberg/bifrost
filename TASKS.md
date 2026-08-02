@@ -83,13 +83,7 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## LATER
 
-- **T-041** Recover a part inside a multipart whose transfer encoding has no decoder. T-032 fixed
-  this for a whole message by going through `message.Read`, but `mail.Reader.NextPart` returns a
-  nil part for the same case nested in a multipart, so those bytes are still lost (skipped with a
-  warning, not silently). Recovering them means walking at the `message` level and reimplementing
-  the six-line inline/attachment split from go-message's `mail` reader. Deliberately not bundled
-  into T-032: swapping the walk is a structural change, not a bug fix.
-  ↳ since 2026-08-02 · pushed 0 · size M · verified 2026-08-02 · ref `mail/mime.go:ParseMessage part walk`
+_Empty. NOW, NEXT and LATER are all clear; what remains is GATED and PARKED._
 ## GATED
 
 - **T-027** 🧭 OAuth2 (XOAUTH2/OAUTHBEARER) for IMAP and SMTP; Gmail and Microsoft 365 have
@@ -112,6 +106,12 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-041** Parts are now walked at the `message` level, so an attachment or body part whose
+  transfer encoding has no decoder is kept as raw bytes with a warning instead of being dropped.
+  ↳ done 2026-08-02 · evidence: a multipart carrying an `x-uuencode` attachment, which the mail
+  reader returns as a nil part (checked against go-message v0.18.2 directly), now parses with the
+  file and its bytes present; nested-multipart and content-type-name tests added alongside, and
+  the existing parse suite passes unchanged against the new walk. v1.24.1
 - **T-025** `FetchThread` reworked: iterative reference expansion, header-only discovery, and
   `slices.SortFunc`. Discovery no longer downloads a candidate's body once per search that
   matched it. Round and message caps are backstops; the walk terminates because an identifier is

@@ -277,7 +277,7 @@ With `--json` the source comes back base64-encoded, as `{"uid":42,"folder":"INBO
 
 ##### Damaged messages
 
-Parsing is best-effort, and it tells you when it had to be. A message cut off in transit yields the bytes that did arrive; one labelled with a charset or transfer encoding Bifrost cannot decode is read as raw bytes rather than refused; a part that cannot be read at all is skipped. Every such case is listed in `warnings`, which is absent from the JSON for the overwhelming majority of mail:
+Parsing is best-effort, and it tells you when it had to be. A message cut off in transit yields the bytes that did arrive; one labelled with a charset or transfer encoding Bifrost cannot decode is read as raw bytes rather than refused, an attachment inside such a part included; a part that cannot be read at all is skipped. Every such case is listed in `warnings`, which is absent from the JSON for the overwhelming majority of mail:
 
 ```json
 {

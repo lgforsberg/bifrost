@@ -314,7 +314,7 @@ func ParseMessage(r io.Reader) (*Message, error)
 
 Parses a raw RFC 2822 message into a `Message`. Walks MIME multipart structure, extracts `text/plain`, `text/html`, and attachments.
 
-Parsing is best-effort and reports what it could not do cleanly in `Message.Warnings`. A body that stops part way keeps the bytes that did arrive, a charset or transfer encoding with no decoder is read raw rather than refused, and a part that cannot be read at all is skipped. An error is returned only when nothing can be recovered, so a non-nil `*Message` with a non-empty `Warnings` is the normal way damage is reported. Callers acting on the body should check it.
+Parsing is best-effort and reports what it could not do cleanly in `Message.Warnings`. A body that stops part way keeps the bytes that did arrive, a charset or transfer encoding with no decoder is read raw rather than refused, whether it labels the whole message or one part of a multipart, and a part that cannot be read at all is skipped. An error is returned only when nothing can be recovered, so a non-nil `*Message` with a non-empty `Warnings` is the normal way damage is reported. Callers acting on the body should check it.
 
 ### Composing
 
