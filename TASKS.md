@@ -78,6 +78,9 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NOW
 
+- **T-017** `draft send` should refuse (or warn without `--force`) when the draft still carries
+  `$PendingApproval`; the keyword is purely advisory today, which defeats the approval workflow.
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-02 · ref `internal/commands/draft.go:draftSend`
 
 ## NEXT
 
@@ -96,12 +99,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 - **T-015** `flag`/`unflag` commands to set and clear `\Flagged`; search can already filter on
   it but nothing can set it, and star-as-todo is a core agent pattern.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/markread.go`
-- **T-016** Expose IMAP keyword search (`search --keyword`); `SearchCriteria.Keywords` exists in
-  the library but the CLI never surfaces it, so `$PendingApproval` drafts cannot be queried.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/search.go`
-- **T-017** `draft send` should refuse (or warn without `--force`) when the draft still carries
-  `$PendingApproval`; the keyword is purely advisory today, which defeats the approval workflow.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/draft.go:174`
 - **T-018** `folder status` command exposing IMAP STATUS (total, unseen, uidnext) so an agent
   can ask "how many unread?" without listing envelopes.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/folder.go`
@@ -157,6 +154,10 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-016** `search --keyword`, repeatable, all of them having to match. Half the approval
+  workflow: the drafts could be tagged but never found again.
+  ↳ done 2026-08-02 · evidence: `TestSearch_FindsDraftsAwaitingApproval` saves one tagged draft
+  and one plain one and expects the search to return only the first. v1.11.0
 - **T-013** Integration test suite, done. `internal/testimap` starts an in-process server that
   both the library and the command tests drive: appends and fetches, trash, archive, folder
   operations and their response codes, Search, FetchThread, both T-006 warning paths, and every

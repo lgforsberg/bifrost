@@ -16,7 +16,7 @@ import (
 	"github.com/lgforsberg/bifrost/mail"
 )
 
-const version = "1.10.2"
+const version = "1.11.0"
 
 func main() {
 	globals, args := parseGlobalFlags(os.Args[1:])

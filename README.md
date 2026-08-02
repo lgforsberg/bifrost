@@ -229,7 +229,8 @@ Attachment bytes are left out of the JSON unless you ask for them: base64 makes 
 
 ```
 bifrost search [--folder FOLDER] [--from X] [--to X] [--subject X] [--body X]
-               [--since YYYY-MM-DD] [--before YYYY-MM-DD] [--unread] [--flagged] [--limit N]
+               [--since YYYY-MM-DD] [--before YYYY-MM-DD] [--unread] [--flagged]
+               [--keyword KEYWORD]... [--limit N]
 ```
 
 At least one search criterion is required.
@@ -241,7 +242,16 @@ At least one search criterion is required.
 | `--since` / `--before` | — | Date range |
 | `--unread` | `false` | Only unseen messages |
 | `--flagged` | `false` | Only flagged messages |
+| `--keyword` | — | IMAP keyword, repeatable; a message must carry all of them |
 | `--limit` | `50` | Max results |
+
+`--keyword` is how you find the drafts `draft save --approval` tagged:
+
+```bash
+bifrost --json search --folder Drafts --keyword '$PendingApproval'
+```
+
+Quote the keyword in a shell, or `$PendingApproval` expands to nothing.
 
 #### `thread` — View conversation thread
 

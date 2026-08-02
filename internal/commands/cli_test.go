@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
@@ -344,6 +345,48 @@ func TestDraft_SaveThenListThenDelete(t *testing.T) {
 	deleted := cli.decodeObject(t)
 	if deleted["movedTo"] != "Trash" {
 		t.Errorf("movedTo = %v, want Trash", deleted["movedTo"])
+	}
+}
+
+// The point of the approval keyword is that something can come back later and
+// ask what is waiting. Until --keyword existed, nothing could.
+func TestSearch_FindsDraftsAwaitingApproval(t *testing.T) {
+	cli := newTestCLI(t)
+
+	if err := Draft(cli.g, []string{"save", "--approval", "--to", "boss@example.com", "--subject", "Needs a look", "--body", "Text"}); err != nil {
+		t.Fatalf("draft save --approval: %v", err)
+	}
+	cli.out.Reset()
+	if err := Draft(cli.g, []string{"save", "--to", "bob@example.com", "--subject", "Ordinary", "--body", "Text"}); err != nil {
+		t.Fatalf("draft save: %v", err)
+	}
+	cli.out.Reset()
+
+	if err := Search(cli.g, []string{"--folder", "Drafts", "--keyword", "$PendingApproval"}); err != nil {
+		t.Fatalf("search --keyword: %v", err)
+	}
+
+	results := cli.decodeArray(t)
+	if len(results) != 1 {
+		t.Fatalf("found %d drafts, want only the one awaiting approval: %v", len(results), results)
+	}
+	if results[0]["subject"] != "Needs a look" {
+		t.Errorf("found %v", results[0]["subject"])
+	}
+}
+
+func TestSearch_RequiresACriterion(t *testing.T) {
+	cli := newTestCLI(t)
+
+	err := Search(cli.g, []string{"--folder", "INBOX"})
+	if err == nil {
+		t.Fatal("search with no criteria succeeded")
+	}
+	if !strings.HasPrefix(err.Error(), "usage:") {
+		t.Errorf("error %q should be a usage error", err)
+	}
+	if !strings.Contains(err.Error(), "--keyword") {
+		t.Errorf("the list of criteria in %q should mention --keyword", err)
 	}
 }
 

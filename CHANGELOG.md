@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-08-02
+
+### Added
+
+- `search --keyword` exposes IMAP keyword search, repeatable, with a message
+  having to carry all of them. `SearchCriteria.Keywords` had been in the
+  library since the first release with no way to reach it from the CLI, which
+  meant the drafts `draft save --approval` tags with `$PendingApproval` could
+  be created but never found again.
+
 ## [1.10.2] - 2026-08-02
 
 ### Fixed
@@ -291,7 +301,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.10.2...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.11.0...HEAD
+[1.11.0]: https://github.com/lgforsberg/bifrost/compare/v1.10.2...v1.11.0
 [1.10.2]: https://github.com/lgforsberg/bifrost/compare/v1.10.1...v1.10.2
 [1.10.1]: https://github.com/lgforsberg/bifrost/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/lgforsberg/bifrost/compare/v1.9.1...v1.10.0

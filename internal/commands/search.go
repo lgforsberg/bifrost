@@ -21,6 +21,8 @@ func Search(g *cmdutil.GlobalFlags, args []string) error {
 	before := fs.String("before", "", "messages before date (YYYY-MM-DD)")
 	unread := fs.Bool("unread", false, "only unseen messages")
 	flagged := fs.Bool("flagged", false, "only flagged messages")
+	var keywords helpers.StringSliceFlag
+	fs.Var(&keywords, "keyword", "IMAP keyword such as $PendingApproval (repeatable, all must match)")
 	folder := fs.String("folder", "INBOX", "folder to search")
 	limit := fs.Int("limit", 50, "max results")
 	if err := fs.Parse(args); err != nil {
@@ -28,19 +30,20 @@ func Search(g *cmdutil.GlobalFlags, args []string) error {
 	}
 
 	hasCriteria := *from != "" || *to != "" || *subject != "" || *body != "" ||
-		*unread || *flagged || *since != "" || *before != ""
+		*unread || *flagged || *since != "" || *before != "" || len(keywords) > 0
 	if !hasCriteria {
-		return fmt.Errorf("usage: at least one search criterion is required (--from, --to, --subject, --body, --unread, --flagged, --since, --before)")
+		return fmt.Errorf("usage: at least one search criterion is required (--from, --to, --subject, --body, --unread, --flagged, --keyword, --since, --before)")
 	}
 
 	criteria := mail.SearchCriteria{
-		From:    *from,
-		To:      *to,
-		Subject: *subject,
-		Body:    *body,
-		Unseen:  *unread,
-		Flagged: *flagged,
-		Limit:   *limit,
+		From:     *from,
+		To:       *to,
+		Subject:  *subject,
+		Body:     *body,
+		Unseen:   *unread,
+		Flagged:  *flagged,
+		Keywords: keywords,
+		Limit:    *limit,
 	}
 
 	if *since != "" {
