@@ -34,6 +34,13 @@ type accountJSON struct {
 	Password     string     `json:"password"`
 	PasswordFile string     `json:"passwordFile"`
 
+	// AuthMechanism and TokenCommand go together: the first says how to
+	// authenticate, the second says what to run to get the token. They are
+	// per-account rather than defaulted, as passwords are, because a token
+	// belongs to one mailbox.
+	AuthMechanism string   `json:"authMechanism"`
+	TokenCommand  []string `json:"tokenCommand"`
+
 	// Folder overrides, which fall back to the ones in defaults. They belong
 	// here as well because two accounts on different providers rarely name
 	// their folders the same way.
@@ -93,9 +100,18 @@ func Load(path string) (*Config, error) {
 	cfg := &Config{Defaults: raw.Defaults, defaultAccount: -1}
 
 	for i, acct := range raw.Accounts {
-		password, err := resolvePassword(acct.Password, acct.PasswordFile)
-		if err != nil {
+		if err := validateAuth(acct); err != nil {
 			return nil, fmt.Errorf("account %d (%s): %w", i, acct.Address, err)
+		}
+
+		// Only one of the two is needed, and which one is settled above.
+		var password string
+		if acct.AuthMechanism == "" {
+			resolved, err := resolvePassword(acct.Password, acct.PasswordFile)
+			if err != nil {
+				return nil, fmt.Errorf("account %d (%s): %w", i, acct.Address, err)
+			}
+			password = resolved
 		}
 
 		if acct.Address == "" {
@@ -113,6 +129,14 @@ func Load(path string) (*Config, error) {
 			return nil, fmt.Errorf("account %d (%s): %w", i, acct.Address, err)
 		}
 
+		// The helper inherits the account's network timeout, on the grounds
+		// that someone who said how long to wait for a server meant how long
+		// to wait for anything.
+		var tokenSource mail.TokenSource
+		if len(acct.TokenCommand) > 0 {
+			tokenSource = tokenCommandSource(acct.TokenCommand, timeout)
+		}
+
 		cfg.Accounts = append(cfg.Accounts, mail.AccountConfig{
 			Address:        acct.Address,
 			DisplayName:    acct.DisplayName,
@@ -124,6 +148,8 @@ func Load(path string) (*Config, error) {
 			SMTPEncryption: withDefaultStr(acct.SMTP.Encryption, "starttls"),
 			Username:       acct.Address,
 			Password:       password,
+			AuthMechanism:  strings.ToLower(strings.TrimSpace(acct.AuthMechanism)),
+			TokenSource:    tokenSource,
 			SentFolder:     withDefaultStr(acct.SentFolder, raw.Defaults.SentFolder),
 			DraftsFolder:   withDefaultStr(acct.DraftsFolder, raw.Defaults.DraftsFolder),
 			TrashFolder:    withDefaultStr(acct.TrashFolder, raw.Defaults.TrashFolder),
@@ -303,6 +329,8 @@ func TemplateJSON() string {
       "smtp": { "host": "smtp.example.com", "port": 587, "encryption": "starttls" },
       "password": "",
       "passwordFile": "~/.bifrost/pass-you@example.com",
+      "authMechanism": "",
+      "tokenCommand": [],
       "sentFolder": "",
       "draftsFolder": "",
       "trashFolder": "",

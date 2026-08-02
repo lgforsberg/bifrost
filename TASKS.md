@@ -3,7 +3,7 @@
 **This file is the single source of truth for what we are working on.** If a task is not
 here, it is not tracked. If it is here, its phase and metadata are current.
 
-> **Next free ID: `T-042`** · IDs are never reused · last full verification sweep **2026-08-01**
+> **Next free ID: `T-043`** · IDs are never reused · last full verification sweep **2026-08-01**
 
 ## How to use this file
 
@@ -83,13 +83,13 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## LATER
 
-_Empty. NOW, NEXT and LATER are all clear; what remains is GATED and PARKED._
+- **T-042** `config init` honours `--config` but ignores `BIFROST_CONFIG`, while every other
+  command respects both: it writes the template to the default path and the next command reads
+  the other one. Found while testing T-027. Fix is to route it through the same path resolution
+  as `Load`.
+  ↳ since 2026-08-02 · pushed 0 · size S · verified 2026-08-02 · ref `internal/commands/config.go:42`
 ## GATED
 
-- **T-027** 🧭 OAuth2 (XOAUTH2/OAUTHBEARER) for IMAP and SMTP; Gmail and Microsoft 365 have
-  retired basic auth, so PLAIN-only locks out the two biggest providers. Gate: decide the token
-  acquisition model first (external helper command in config vs built-in refresh flow).
-  ↳ since 2026-08-01 · pushed 0 · size L · verified 2026-08-01 · ref `mail/imap.go:Connect`
 - **T-028** 👤 Move off `go-imap v2.0.0-beta.8` when upstream ships a stable v2; until then,
   pin deliberately and note the beta status in the README (covered by T-014).
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `go.mod`
@@ -106,6 +106,14 @@ _Empty. NOW, NEXT and LATER are all clear; what remains is GATED and PARKED._
 
 ## DONE
 
+- **T-027** OAuth2 for IMAP and SMTP, by the helper-command model: an account names a command
+  that prints an access token, and Bifrost acquires nothing itself. XOAUTH2 is implemented here
+  (go-sasl has only OAUTHBEARER) because it is the one Microsoft 365 requires and Gmail also
+  takes, so a single mechanism reaches both.
+  ↳ done 2026-08-02 · evidence: the initial client response matches the worked example in
+  Google's specification byte for byte, which Microsoft's documentation repeats; helper contract
+  and config validation covered by table tests; a server lacking the mechanism and a failing
+  helper each produce their own error against the in-memory server. v1.25.0
 - **T-041** Parts are now walked at the `message` level, so an attachment or body part whose
   transfer encoding has no decoder is kept as raw bytes with a warning instead of being dropped.
   ↳ done 2026-08-02 · evidence: a multipart carrying an `x-uuencode` attachment, which the mail

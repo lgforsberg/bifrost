@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
@@ -54,10 +55,29 @@ func SmtpDeliver(ctx context.Context, config AccountConfig, from string, compose
 	if err := client.Hello("localhost"); err != nil {
 		return classifySMTPError("greeting", err, ErrConnectionFailed)
 	}
-	if ok, _ := client.Extension("AUTH"); !ok {
+	ok, offered := client.Extension("AUTH")
+	if !ok {
 		return fmt.Errorf("SMTP server %s does not support AUTH: %w", addr, ErrAuthFailed)
 	}
-	if err := client.Auth(sasl.NewPlainClient("", username, config.Password)); err != nil {
+
+	mechanism, saslClient, err := config.saslExchange(ctx)
+	if err != nil {
+		return err
+	}
+	if saslClient == nil {
+		saslClient = sasl.NewPlainClient("", username, config.Password)
+	} else if !mechanismOffered(mechanism, strings.Fields(offered)) {
+		// Same reasoning as on the IMAP side: a mechanism the server never
+		// offered and a token with the wrong scope both come back as an
+		// authentication failure, and they are fixed in different places.
+		return fmt.Errorf("SMTP server %s does not offer %s, only %s: %w",
+			addr, mechanism, offered, ErrAuthFailed)
+	}
+
+	if err := client.Auth(saslClient); err != nil {
+		if detail := saslFailureDetail(saslClient); detail != "" {
+			return classifySMTPError("auth", fmt.Errorf("%w (server said: %s)", err, detail), ErrAuthFailed)
+		}
 		return classifySMTPError("auth", err, ErrAuthFailed)
 	}
 	if err := client.SendMail(from, recipients, bytes.NewReader(composedMsg)); err != nil {

@@ -6,6 +6,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-08-02
+
+### Added
+
+- OAuth2 authentication for IMAP and SMTP, via the `xoauth2` and
+  `oauthbearer` SASL mechanisms. Gmail and Microsoft 365 have retired
+  password authentication, so those accounts could not be used at all before
+  this.
+- Accounts set `authMechanism` and `tokenCommand`, where the command prints an
+  access token on stdout. Bifrost does not acquire tokens itself: that needs
+  provider-specific registration, scopes and a browser consent step, and
+  would make Bifrost a secrets store that prompts. A command composes with
+  whatever already holds the credentials instead.
+- An account authenticates by password or by token, and a config that mixes
+  the two is rejected rather than silently resolved.
+
+### Changed
+
+- Authentication failures try to name the right cause, since the failures
+  look alike and are fixed in different places: a server that never offered
+  the mechanism says so and lists what it does offer, a token helper that
+  fails is reported as a helper failure with its own message, and a refused
+  token carries the server's explanation, which is where a missing scope is
+  named.
+
 ## [1.24.1] - 2026-08-02
 
 ### Fixed
@@ -558,7 +583,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.24.1...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.25.0...HEAD
+[1.25.0]: https://github.com/lgforsberg/bifrost/compare/v1.24.1...v1.25.0
 [1.24.1]: https://github.com/lgforsberg/bifrost/compare/v1.24.0...v1.24.1
 [1.24.0]: https://github.com/lgforsberg/bifrost/compare/v1.23.0...v1.24.0
 [1.23.0]: https://github.com/lgforsberg/bifrost/compare/v1.22.0...v1.23.0

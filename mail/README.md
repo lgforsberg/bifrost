@@ -48,11 +48,31 @@ type AccountConfig struct {
     SMTPEncryption string // "starttls", "tls", "none"
     Username       string // defaults to Address if empty
     Password       string
+    AuthMechanism  string      // "" for a password, or AuthXOAuth2 / AuthOAuthBearer
+    TokenSource    TokenSource // required when AuthMechanism is a token mechanism
     Timeout        time.Duration // 0 leaves the built-in network timeouts
 }
 
 func (a *AccountConfig) EffectiveUsername() string
 ```
+
+### Authentication
+
+```go
+const (
+    AuthPassword    = ""            // IMAP LOGIN, SMTP AUTH PLAIN
+    AuthXOAuth2     = "xoauth2"     // Google's mechanism, and the one Microsoft 365 requires
+    AuthOAuthBearer = "oauthbearer" // RFC 7628
+)
+
+type TokenSource func(ctx context.Context) (string, error)
+```
+
+Set `AuthMechanism` and `TokenSource` together to authenticate with an OAuth2 access token, which Gmail and Microsoft 365 now require. Prefer `AuthXOAuth2`: Microsoft accepts only that one, and Gmail accepts it too.
+
+Acquiring the token is not this package's business. `TokenSource` is called once per connection, so it can return a cached token and refresh when that expires, and the token is never stored on the config. The CLI implements one that runs a command from the account's configuration; a library caller can do whatever suits it.
+
+A refusal is reported as `ErrAuthFailed`, distinguished from a server that does not offer the mechanism at all, which says so and lists what it does offer. Where XOAUTH2 returns a reason (usually a missing scope), it is included in the error.
 
 ### Envelope
 

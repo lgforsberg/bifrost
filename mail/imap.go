@@ -58,22 +58,59 @@ func (c *IMAPClient) Connect(ctx context.Context) error {
 	}
 
 	username := c.config.EffectiveUsername()
-	if err := client.Login(username, c.config.Password).Wait(); err != nil {
+	if err := c.authenticate(ctx, client, username); err != nil {
 		release()
 		client.Close()
-		// The server refusing the credentials is an auth failure; the exchange
-		// breaking part way through is not, and saying so sends the caller off
-		// checking a password that was never the problem.
-		if !isStatusResponse(err) {
-			return fmt.Errorf("login as %s: %w: %w", username, err, ErrConnectionFailed)
-		}
-		return fmt.Errorf("login as %s: %w: %w", username, err, ErrAuthFailed)
+		return err
 	}
 
 	c.logger.Debug("IMAP connected and authenticated", "user", username)
 	c.client = client
 	c.release = release
 	return nil
+}
+
+// authenticate presents the account's credentials: a SASL exchange when the
+// account asks for a token mechanism, LOGIN otherwise.
+func (c *IMAPClient) authenticate(ctx context.Context, client *imapclient.Client, username string) error {
+	mechanism, saslClient, err := c.config.saslExchange(ctx)
+	if err != nil {
+		return err
+	}
+
+	if saslClient == nil {
+		return classifyIMAPAuthError(username, client.Login(username, c.config.Password).Wait(), "")
+	}
+
+	// Asking first turns a refusal into a sentence that says why. A server
+	// that never offered the mechanism produces the same "authentication
+	// failed" as a token with the wrong scope, and the two are fixed in
+	// entirely different places.
+	if offered := client.Caps().AuthMechanisms(); !mechanismOffered(mechanism, offered) {
+		return fmt.Errorf("IMAP server does not offer %s, only %s: %w",
+			mechanism, strings.Join(offered, ", "), ErrAuthFailed)
+	}
+
+	c.logger.Debug("authenticating over SASL", "mechanism", mechanism, "user", username)
+	return classifyIMAPAuthError(username, client.Authenticate(saslClient), saslFailureDetail(saslClient))
+}
+
+// classifyIMAPAuthError maps a failed sign-in onto a sentinel, and passes on
+// anything the mechanism itself learned about the refusal.
+func classifyIMAPAuthError(username string, err error, detail string) error {
+	if err == nil {
+		return nil
+	}
+	// The server refusing the credentials is an auth failure; the exchange
+	// breaking part way through is not, and saying so sends the caller off
+	// checking a password that was never the problem.
+	if !isStatusResponse(err) {
+		return fmt.Errorf("login as %s: %w: %w", username, err, ErrConnectionFailed)
+	}
+	if detail != "" {
+		return fmt.Errorf("login as %s: %w (server said: %s): %w", username, err, detail, ErrAuthFailed)
+	}
+	return fmt.Errorf("login as %s: %w: %w", username, err, ErrAuthFailed)
 }
 
 func (c *IMAPClient) Close() error {

@@ -117,13 +117,15 @@ An override wins over the server's answer. Commands that file mail somewhere (`a
 | `smtp.encryption` | No | `starttls` (default), `tls`, or `none` |
 | `password` | * | Inline password |
 | `passwordFile` | * | Path to a file containing the password (tilde-expanded) |
+| `authMechanism` | * | `xoauth2` or `oauthbearer` instead of a password |
+| `tokenCommand` | * | Command that prints an OAuth2 access token, as an argv array |
 | `sentFolder` | No | Override this account's Sent folder |
 | `draftsFolder` | No | Override this account's Drafts folder |
 | `trashFolder` | No | Override this account's Trash folder |
 | `archiveFolder` | No | Override this account's Archive folder |
 | `timeout` | No | Override this account's network timeout |
 
-\* One of `password` or `passwordFile` is required. A `passwordFile` keeps the secret out of the config.
+\* An account authenticates one way or the other. Either set one of `password` or `passwordFile`, where a `passwordFile` keeps the secret out of the config, or set both `authMechanism` and `tokenCommand` for OAuth2. Mixing the two is rejected rather than silently resolved, so the config cannot claim one thing while another happens.
 
 The four folder overrides can be set per account as well as in `defaults`. An account's own value wins, and anything it leaves out falls back to the default, which matters when two accounts are on providers that name their folders differently. `timeout` works the same way.
 
@@ -136,6 +138,44 @@ bifrost --timeout 5s --json inbox
 ```
 
 Shorter suits an agent that would rather fail and retry than wait; longer suits a slow link or a server that takes its time on a large mailbox. A timeout of zero is rejected rather than taken to mean "wait forever", since it is much likelier to be a mistake.
+
+### OAuth2
+
+Gmail and Microsoft 365 have retired password authentication for IMAP and SMTP, so those accounts need a token. Set `authMechanism` to `xoauth2` and give Bifrost a command that prints one:
+
+```json
+{
+  "address": "you@gmail.com",
+  "imap": { "host": "imap.gmail.com", "port": 993, "encryption": "tls" },
+  "smtp": { "host": "smtp.gmail.com", "port": 587, "encryption": "starttls" },
+  "authMechanism": "xoauth2",
+  "tokenCommand": ["~/.bifrost/gmail-token", "you@gmail.com"]
+}
+```
+
+**Bifrost does not acquire tokens itself.** It runs your command before each connection and reads an access token from its standard output. That is the whole design, and it is deliberate. Acquiring a token means provider-specific endpoints, a client registration, the right scopes, and a browser consent step at least once, after which a refresh token has to be kept somewhere safe. Doing that internally would make Bifrost a secrets store, tie it to particular providers, and require it to prompt, which it never does. A command instead composes with whatever already holds your credentials: `gcloud`, `az`, a password manager's CLI, or a small refresher on a timer.
+
+The contract for the command is deliberately narrow:
+
+| Rule | Why |
+|------|-----|
+| Given as an argv array, never a shell string | No quoting rules to get wrong, and no shell interpretation of a config value |
+| Prints the access token alone on stdout | Surrounding whitespace is trimmed; a second line is an error rather than a credential |
+| Exits non-zero to fail | Its stderr is quoted back in Bifrost's error, so the helper can explain itself |
+| Gets no stdin, and must not prompt | Bifrost never blocks on input, and its own stdin may be a message body being piped in |
+| Must finish inside the account's `timeout`, or 30 seconds | A helper that waits would hang the command with nothing coming to unblock it |
+
+The first element is tilde-expanded, so `~/.bifrost/gmail-token` works.
+
+**Which mechanism.** Use `xoauth2` unless you know otherwise. It is what Microsoft documents for IMAP and SMTP and the only one it accepts, and Gmail takes it too, so one setting covers both. `oauthbearer` is the standardised mechanism (RFC 7628) and is there for servers that offer it instead.
+
+**Scopes** are the usual reason a token is refused. Gmail wants `https://mail.google.com/`; the narrower `gmail.send` scope is not enough for IMAP. Microsoft 365 wants `https://outlook.office.com/IMAP.AccessAsUser.All` and `https://outlook.office.com/SMTP.Send`.
+
+Errors here try to point at the right thing, because the failures look alike and are fixed in different places. A server that never offered the mechanism says so and lists what it does offer. A helper that fails is reported as a helper failure, with its own message, not as a bad credential. And when a token is refused, the server's explanation is quoted, which is normally where the missing scope is named:
+
+```
+login as you@gmail.com: NO ... (server said: {"status":"400","schemes":"Bearer","scope":"https://mail.google.com/"}): authentication failed
+```
 
 ## CLI reference
 

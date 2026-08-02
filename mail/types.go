@@ -30,6 +30,17 @@ type AccountConfig struct {
 	Username       string // defaults to Address if empty
 	Password       string
 
+	// AuthMechanism selects how the account proves who it is. Empty means a
+	// password; see the Auth constants for the token mechanisms. Gmail and
+	// Microsoft 365 have retired password auth, so those accounts need one.
+	AuthMechanism string
+
+	// TokenSource supplies the bearer token when AuthMechanism is a token
+	// mechanism, and is required in that case. Obtaining the token is
+	// deliberately not this package's business: how it is acquired, cached
+	// and refreshed differs per provider and per deployment.
+	TokenSource TokenSource
+
 	// Timeout bounds any single wait on the network: establishing the
 	// connection, and each read or write once it is up. Zero leaves the
 	// built-in defaults, which are deliberately not the same for the two.
