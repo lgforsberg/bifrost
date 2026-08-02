@@ -78,12 +78,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NOW
 
-
-## NEXT
-
-- **T-015** `flag`/`unflag` commands to set and clear `\Flagged`; search can already filter on
-  it but nothing can set it, and star-as-todo is a core agent pattern.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/markread.go`
 - **T-018** `folder status` command exposing IMAP STATUS (total, unseen, uidnext) so an agent
   can ask "how many unread?" without listing envelopes.
   ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/folder.go`
@@ -92,6 +86,8 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   reachable without a working account. Discovering what a command takes should not require
   credentials. Parse for `-h`/`--help` before loading, or defer the load until after `fs.Parse`.
   ↳ since 2026-08-02 · pushed 0 · size S · verified 2026-08-02 · ref `cmd/bifrost/main.go` dispatch
+
+## NEXT
 
 ## LATER
 
@@ -153,6 +149,11 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-015** `flag`/`unflag` set and clear `\Flagged`. The marker was readable and not writable:
+  `search --flagged` had nothing to find. One implementation behind both commands, since they
+  differ only in direction.
+  ↳ done 2026-08-02 · evidence: four command tests, the load-bearing one being flag → search
+  --flagged → unflag → search finds nothing. v1.16.0
 - **T-019** `read --raw` writes the message source unparsed. Base64 under `--json`, because RFC
   822 source need not be valid UTF-8 and a JSON string would replace what is not; this matches
   how attachment bytes already travel. Refuses `--save-attachments` rather than accepting a flag

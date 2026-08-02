@@ -237,6 +237,8 @@ func (c *IMAPClient) MarkRead(ctx context.Context, folder string, uid uint32) er
 func (c *IMAPClient) MarkReadBatch(ctx context.Context, folder string, uids []uint32) error
 func (c *IMAPClient) MarkUnread(ctx context.Context, folder string, uid uint32) error
 func (c *IMAPClient) MarkUnreadBatch(ctx context.Context, folder string, uids []uint32) error
+func (c *IMAPClient) FlagBatch(ctx context.Context, folder string, uids []uint32) error
+func (c *IMAPClient) UnflagBatch(ctx context.Context, folder string, uids []uint32) error
 func (c *IMAPClient) AddKeyword(ctx context.Context, folder string, uids []uint32, keyword string) error
 func (c *IMAPClient) RemoveKeyword(ctx context.Context, folder string, uids []uint32, keyword string) error
 func (c *IMAPClient) FetchFlags(ctx context.Context, folder string, uid uint32) ([]string, error)

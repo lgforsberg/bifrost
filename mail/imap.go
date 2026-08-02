@@ -303,6 +303,19 @@ func (c *IMAPClient) MarkUnread(ctx context.Context, folder string, uid uint32) 
 	return c.MarkUnreadBatch(ctx, folder, []uint32{uid})
 }
 
+// FlagBatch sets \Flagged, the star every mail client puts next to a message
+// worth coming back to. Search can already filter on it, which is what makes
+// it useful as a marker rather than just decoration.
+func (c *IMAPClient) FlagBatch(ctx context.Context, folder string, uids []uint32) error {
+	return c.storeFlags(folder, uids, imap.StoreFlagsAdd, imap.FlagFlagged)
+}
+
+// UnflagBatch clears \Flagged. Clearing it where it was never set is not an
+// error, which is what IMAP does.
+func (c *IMAPClient) UnflagBatch(ctx context.Context, folder string, uids []uint32) error {
+	return c.storeFlags(folder, uids, imap.StoreFlagsDel, imap.FlagFlagged)
+}
+
 // AddKeyword sets an IMAP keyword such as $PendingApproval on messages.
 func (c *IMAPClient) AddKeyword(ctx context.Context, folder string, uids []uint32, keyword string) error {
 	return c.storeFlags(folder, uids, imap.StoreFlagsAdd, imap.Flag(keyword))

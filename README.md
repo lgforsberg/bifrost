@@ -187,6 +187,7 @@ Without `--json`, errors print to stderr as `error: <message>`.
 | `archive` | Archive messages |
 | `move` | Move messages to another folder |
 | `mark-read` / `mark-unread` | Change read state |
+| `flag` / `unflag` | Set or clear the `\Flagged` marker |
 | `folder` | Manage folders (list, create, rename, delete) |
 | `accounts` | List configured accounts |
 | `draft` | Manage drafts (save, list, send, delete) |
@@ -355,7 +356,7 @@ bifrost forward --to ADDR [--to ADDR...] [--folder FOLDER] [--from ADDR] [--no-s
 
 Original attachments are included automatically; `--attach` appends more.
 
-#### `delete` / `archive` / `move` / `mark-read` / `mark-unread`
+#### `delete` / `archive` / `move` / `mark-read` / `mark-unread` / `flag` / `unflag`
 
 ```
 bifrost delete       [--folder FOLDER] [--permanent] <uid> [uid...]
@@ -363,6 +364,8 @@ bifrost archive      [--folder FOLDER] <uid> [uid...]
 bifrost move --to FOLDER [--folder FOLDER | --from FOLDER] <uid> [uid...]
 bifrost mark-read    [--folder FOLDER] <uid> [uid...]
 bifrost mark-unread  [--folder FOLDER] <uid> [uid...]
+bifrost flag         [--folder FOLDER] <uid> [uid...]
+bifrost unflag       [--folder FOLDER] <uid> [uid...]
 ```
 
 All are batch operations. JSON output reports `uids` acted on and `skippedUids` for any that didn't exist:
@@ -374,6 +377,16 @@ All are batch operations. JSON output reports `uids` acted on and `skippedUids` 
 `delete` moves messages to Trash, where they can be recovered until the trash is emptied. `--permanent` expunges them instead, which cannot be undone. Deleting from Trash itself expunges, since there is nowhere further to move to. The JSON result reports `permanent` and, when the messages were moved, `movedTo`.
 
 `archive` moves messages to whichever folder the server advertises as `\Archive`, so it follows a renamed or localized archive folder. If the server advertises none, it falls back to a folder named `Archive` or `Archives`, creating `Archive` if neither exists.
+
+`flag` sets `\Flagged`, the star every mail client shows, and `unflag` clears it. Since `search --flagged` already filters on it, the pair gives you a to-do marker that survives between invocations and is visible in any other client:
+
+```bash
+bifrost flag 42                        # park it for later
+bifrost --json search --flagged        # what is still parked
+bifrost unflag 42                      # done with it
+```
+
+Clearing a flag that was never set is not an error, which is what IMAP does.
 
 #### `folder` — Manage folders
 

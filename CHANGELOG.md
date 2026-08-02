@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-08-02
+
+### Added
+
+- `flag` and `unflag` set and clear `\Flagged` on a batch of messages.
+  `search --flagged` could already filter on it but nothing could set it, so
+  the marker was readable and not writable. Clearing a flag that was never set
+  is not an error.
+- `mail.IMAPClient.FlagBatch` and `UnflagBatch`.
+
 ## [1.15.0] - 2026-08-02
 
 ### Added
@@ -378,7 +388,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.15.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.16.0...HEAD
+[1.16.0]: https://github.com/lgforsberg/bifrost/compare/v1.15.0...v1.16.0
 [1.15.0]: https://github.com/lgforsberg/bifrost/compare/v1.14.0...v1.15.0
 [1.14.0]: https://github.com/lgforsberg/bifrost/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/lgforsberg/bifrost/compare/v1.12.0...v1.13.0

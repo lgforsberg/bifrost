@@ -16,7 +16,7 @@ import (
 	"github.com/lgforsberg/bifrost/mail"
 )
 
-const version = "1.15.0"
+const version = "1.16.0"
 
 func main() {
 	globals, args := parseGlobalFlags(os.Args[1:])
@@ -93,6 +93,10 @@ func main() {
 		err = commands.MarkRead(&globals, cmdArgs)
 	case "mark-unread":
 		err = commands.MarkUnread(&globals, cmdArgs)
+	case "flag":
+		err = commands.Flag(&globals, cmdArgs)
+	case "unflag":
+		err = commands.Unflag(&globals, cmdArgs)
 	case "folder":
 		err = commands.Folder(&globals, cmdArgs)
 	case "accounts":
@@ -209,6 +213,8 @@ Commands:
   move         Move messages to another folder
   mark-read    Mark messages as read
   mark-unread  Mark messages as unread
+  flag         Flag messages (\Flagged)
+  unflag       Clear the flag on messages
   folder       Manage folders (list, create, rename, delete)
   accounts     List configured accounts
   draft        Manage drafts (save, list, send, approve, delete)

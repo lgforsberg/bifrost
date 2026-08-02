@@ -433,6 +433,80 @@ func TestRead_RawRefusesToPretendItCanSaveAttachments(t *testing.T) {
 	}
 }
 
+// Flagging is only worth anything if search can find what was flagged, which
+// is the whole reason the gap mattered: the filter existed with nothing to
+// filter on.
+func TestFlag_RoundTripThroughSearch(t *testing.T) {
+	cli := newTestCLI(t)
+	uids := cli.seed(t, "INBOX", "Needs a look", "Ignore me")
+	target := fmt.Sprintf("%d", uids[0])
+
+	if err := Flag(cli.g, []string{target}); err != nil {
+		t.Fatalf("flag: %v", err)
+	}
+	cli.out.Reset()
+
+	if err := Search(cli.g, []string{"--flagged"}); err != nil {
+		t.Fatalf("search --flagged: %v", err)
+	}
+	found := cli.decodeArray(t)
+	if len(found) != 1 {
+		t.Fatalf("search found %d flagged messages, want 1", len(found))
+	}
+	if subject, _ := found[0]["subject"].(string); subject != "Needs a look" {
+		t.Errorf("flagged subject = %q, want the one that was flagged", subject)
+	}
+	cli.out.Reset()
+
+	if err := Unflag(cli.g, []string{target}); err != nil {
+		t.Fatalf("unflag: %v", err)
+	}
+	cli.out.Reset()
+
+	if err := Search(cli.g, []string{"--flagged"}); err != nil {
+		t.Fatalf("search --flagged after unflag: %v", err)
+	}
+	if found := cli.decodeArray(t); len(found) != 0 {
+		t.Errorf("search still finds %d flagged messages after unflag", len(found))
+	}
+}
+
+func TestFlag_JSONReportsWhatItTouched(t *testing.T) {
+	cli := newTestCLI(t)
+	uids := cli.seed(t, "INBOX", "One", "Two")
+
+	if err := Flag(cli.g, []string{fmt.Sprintf("%d", uids[0]), fmt.Sprintf("%d", uids[1])}); err != nil {
+		t.Fatalf("flag: %v", err)
+	}
+
+	obj := cli.decodeObject(t)
+	if obj["status"] != "flagged" {
+		t.Errorf("status = %v, want flagged", obj["status"])
+	}
+	if touched, _ := obj["uids"].([]any); len(touched) != 2 {
+		t.Errorf("uids = %v, want both", obj["uids"])
+	}
+}
+
+// IMAP does not mind clearing a flag that was never set, and neither should we.
+func TestUnflag_OnAnUnflaggedMessageIsFine(t *testing.T) {
+	cli := newTestCLI(t)
+	uids := cli.seed(t, "INBOX", "Never flagged")
+
+	if err := Unflag(cli.g, []string{fmt.Sprintf("%d", uids[0])}); err != nil {
+		t.Fatalf("unflag: %v", err)
+	}
+}
+
+func TestFlag_MissingUIDIsAUsageError(t *testing.T) {
+	cli := newTestCLI(t)
+
+	err := Flag(cli.g, nil)
+	if err == nil || !strings.HasPrefix(err.Error(), "usage:") {
+		t.Fatalf("error = %v, want a usage error", err)
+	}
+}
+
 func TestRead_JSON(t *testing.T) {
 	cli := newTestCLI(t)
 	uids := cli.seed(t, "INBOX", "Hello")
