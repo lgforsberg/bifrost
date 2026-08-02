@@ -23,7 +23,7 @@ import (
 // version is what this binary claims to be when the build carries no module
 // version of its own, which is the case for every build made from a source
 // tree rather than resolved from a tag.
-const version = "1.20.0"
+const version = "1.21.0"
 
 // buildInfo is what the running binary actually is. Revision and Modified come
 // from the VCS stamps the toolchain embeds and are absent from a build made

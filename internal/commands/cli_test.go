@@ -1020,3 +1020,138 @@ func TestCommands_MissingArgumentIsAUsageError(t *testing.T) {
 func errorIsNotFound(err error) bool {
 	return errors.Is(err, mail.ErrNotFound)
 }
+
+// Triage across folders used to need one invocation per folder, and the
+// results could not be told apart afterwards because a UID alone does not say
+// which mailbox it belongs to.
+func TestSearch_AcrossNamedFolders(t *testing.T) {
+	cli := newTestCLI(t)
+	cli.seed(t, "INBOX", "quarterly numbers")
+	cli.seed(t, "Archive", "quarterly numbers from last year")
+	cli.seed(t, "Archive", "nothing to do with it")
+	cli.seed(t, "Projects", "quarterly numbers again")
+
+	if err := Search(cli.g, []string{"--subject", "quarterly",
+		"--folder", "INBOX", "--folder", "Archive"}); err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	results := cli.decodeArray(t)
+
+	if len(results) != 2 {
+		t.Fatalf("got %d matches, want the two in the folders that were named: %v", len(results), results)
+	}
+
+	byFolder := map[string]string{}
+	for _, r := range results {
+		folder, ok := r["folder"].(string)
+		if !ok || folder == "" {
+			t.Fatalf("a result does not say which folder it came from: %v", r)
+		}
+		byFolder[folder], _ = r["subject"].(string)
+	}
+	if byFolder["INBOX"] != "quarterly numbers" {
+		t.Errorf("INBOX match = %q", byFolder["INBOX"])
+	}
+	if byFolder["Archive"] != "quarterly numbers from last year" {
+		t.Errorf("Archive match = %q", byFolder["Archive"])
+	}
+}
+
+func TestSearch_AllFolders(t *testing.T) {
+	cli := newTestCLI(t)
+	cli.seed(t, "INBOX", "quarterly numbers")
+	cli.seed(t, "Archive", "quarterly numbers from last year")
+	cli.seed(t, "Projects", "quarterly numbers again")
+	cli.seed(t, "Projects", "unrelated")
+
+	if err := Search(cli.g, []string{"--subject", "quarterly", "--all-folders"}); err != nil {
+		t.Fatalf("search --all-folders: %v", err)
+	}
+	results := cli.decodeArray(t)
+
+	if len(results) != 3 {
+		t.Fatalf("got %d matches, want one from each of the three folders: %v", len(results), results)
+	}
+	for _, r := range results {
+		if folder, _ := r["folder"].(string); folder == "" {
+			t.Errorf("a result does not say which folder it came from: %v", r)
+		}
+	}
+}
+
+// The total has to count every match everywhere, not just the folder that
+// happened to be searched last.
+func TestSearch_AcrossFoldersCountsEveryMatch(t *testing.T) {
+	cli := newTestCLI(t)
+	cli.seed(t, "INBOX", "quarterly one", "quarterly two")
+	cli.seed(t, "Archive", "quarterly three")
+
+	err := Search(cli.g, []string{"--subject", "quarterly", "--all-folders",
+		"--with-total", "--limit", "2"})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	page := cli.decodeObject(t)
+
+	if total, _ := page["total"].(float64); int(total) != 3 {
+		t.Errorf("total = %v, want 3", page["total"])
+	}
+	messages, _ := page["messages"].([]any)
+	if len(messages) != 2 {
+		t.Errorf("returned %d messages, want the 2 asked for", len(messages))
+	}
+}
+
+// The default is unchanged: no --folder still means INBOX and nothing else.
+func TestSearch_DefaultsToInboxAlone(t *testing.T) {
+	cli := newTestCLI(t)
+	cli.seed(t, "INBOX", "quarterly numbers")
+	cli.seed(t, "Archive", "quarterly numbers from last year")
+
+	if err := Search(cli.g, []string{"--subject", "quarterly"}); err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	results := cli.decodeArray(t)
+
+	if len(results) != 1 {
+		t.Fatalf("got %d matches, want only the one in INBOX: %v", len(results), results)
+	}
+	if folder, _ := results[0]["folder"].(string); folder != "INBOX" {
+		t.Errorf("folder = %q, want INBOX", folder)
+	}
+}
+
+func TestSearch_FolderNamedTwiceIsSearchedOnce(t *testing.T) {
+	cli := newTestCLI(t)
+	cli.seed(t, "INBOX", "quarterly numbers")
+
+	err := Search(cli.g, []string{"--subject", "quarterly", "--folder", "INBOX", "--folder", "INBOX"})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if results := cli.decodeArray(t); len(results) != 1 {
+		t.Errorf("got %d matches, want the one message reported once: %v", len(results), results)
+	}
+}
+
+func TestSearch_AllFoldersConflictsWithFolder(t *testing.T) {
+	cli := newTestCLI(t)
+
+	err := Search(cli.g, []string{"--subject", "x", "--all-folders", "--folder", "INBOX"})
+	if err == nil {
+		t.Fatal("asking for all folders and a specific one was accepted")
+	}
+	if !strings.HasPrefix(err.Error(), "usage:") {
+		t.Errorf("error = %q, want a usage error so it exits 2", err)
+	}
+}
+
+func TestSearch_MissingFolderIsReportedAsNotFound(t *testing.T) {
+	cli := newTestCLI(t)
+	cli.seed(t, "INBOX", "anything")
+
+	err := Search(cli.g, []string{"--subject", "x", "--folder", "NoSuchFolder"})
+	if !errors.Is(err, mail.ErrNotFound) {
+		t.Errorf("error = %v, want mail.ErrNotFound", err)
+	}
+}

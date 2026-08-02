@@ -96,9 +96,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   the six-line inline/attachment split from go-message's `mail` reader. Deliberately not bundled
   into T-032: swapping the walk is a structural change, not a bug fix.
   ↳ since 2026-08-02 · pushed 0 · size M · verified 2026-08-02 · ref `mail/mime.go:ParseMessage part walk`
-- **T-021** Cross-folder search (repeatable `--folder` or `--all-folders`); triage across
-  folders currently needs one invocation per folder.
-  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `internal/commands/search.go`
 - **T-023** `draft update <uid>`: append the revised draft and delete the old one in a single
   command so agent revision loops are not save-new-then-delete-old by hand.
   ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `internal/commands/draft.go`
@@ -128,6 +125,12 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-021** Cross-folder search: `--folder` repeats and `--all-folders` covers everything
+  selectable, merged by date with the limit and total applied across the merge. Required
+  `Envelope.Folder`, without which a merged UID identifies nothing.
+  ↳ done 2026-08-02 · evidence: seven CLI tests over the in-memory IMAP server covering named
+  folders, all folders, the merged total, the unchanged INBOX default, a folder named twice, the
+  flag conflict and a missing folder. v1.21.0
 - **T-026** Code hygiene batch, all six items. Message-ID uses the sender's domain instead of the
   machine's hostname; the global flag parser rejects a missing, empty or unknown option instead of
   ignoring it, and takes `--flag=value` and `-flag`; `truncate` counts runes; `Envelope.Size`

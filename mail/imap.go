@@ -2,12 +2,14 @@ package mail
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"math"
 	"net"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -167,7 +169,7 @@ func (c *IMAPClient) ListEnvelopePage(ctx context.Context, folder string, limit,
 	// Return newest-first
 	envelopes := make([]Envelope, 0, len(messages))
 	for i := len(messages) - 1; i >= 0; i-- {
-		envelopes = append(envelopes, imapEnvelopeToEnvelope(messages[i]))
+		envelopes = append(envelopes, imapEnvelopeToEnvelope(messages[i], folder))
 	}
 	page.Messages = envelopes
 	return page, nil
@@ -265,7 +267,7 @@ func (c *IMAPClient) fetchSource(ctx context.Context, folder string, uid uint32,
 		return nil, Envelope{}, fmt.Errorf("no body returned for uid %d: %w", uid, ErrNotFound)
 	}
 
-	return body, imapEnvelopeToEnvelope(msg), nil
+	return body, imapEnvelopeToEnvelope(msg, folder), nil
 }
 
 func (c *IMAPClient) DeleteMessages(ctx context.Context, folder string, uids []uint32) error {
@@ -517,6 +519,60 @@ func (c *IMAPClient) Search(ctx context.Context, folder string, criteria SearchC
 	return page.Messages, nil
 }
 
+// SearchFoldersPage runs the same search over several folders and merges the
+// results into one page, newest last, as a single-folder search returns them.
+// Total counts every match across every folder, before the limit.
+//
+// Each result carries the folder it came from, which is not decoration: a UID
+// only means something inside one mailbox, so a merged result cannot be acted
+// on without it.
+//
+// The folders are searched in turn on the one connection, since IMAP has a
+// single selected mailbox and there is nothing to run in parallel. The limit
+// is applied twice, once per folder and once to the merge, so a search of
+// twenty folders does not fetch twenty pages worth of envelopes to discard
+// most of them.
+func (c *IMAPClient) SearchFoldersPage(ctx context.Context, folders []string, criteria SearchCriteria) (EnvelopePage, error) {
+	if len(folders) == 1 {
+		return c.SearchPage(ctx, folders[0], criteria)
+	}
+
+	page := EnvelopePage{Limit: criteria.Limit, Messages: []Envelope{}}
+	var total int64
+
+	for _, folder := range folders {
+		if err := ctx.Err(); err != nil {
+			return EnvelopePage{}, err
+		}
+
+		found, err := c.SearchPage(ctx, folder, criteria)
+		if err != nil {
+			return EnvelopePage{}, fmt.Errorf("searching %s: %w", folder, err)
+		}
+		total += int64(found.Total)
+		page.Messages = append(page.Messages, found.Messages...)
+	}
+	page.Total = clampToUint32(total)
+
+	// Date is the only ordering that means anything across mailboxes, UIDs
+	// being unrelated between them. Folder and UID break ties so that two runs
+	// of the same search agree.
+	slices.SortFunc(page.Messages, func(a, b Envelope) int {
+		if c := a.Date.Compare(b.Date); c != 0 {
+			return c
+		}
+		if c := strings.Compare(a.Folder, b.Folder); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.UID, b.UID)
+	})
+
+	if criteria.Limit > 0 && len(page.Messages) > criteria.Limit {
+		page.Messages = page.Messages[len(page.Messages)-criteria.Limit:]
+	}
+	return page, nil
+}
+
 // SearchPage is Search plus how many messages matched before the limit cut the
 // result down. A search that quietly returns its limit looks the same as one
 // that found exactly that many.
@@ -524,6 +580,9 @@ func (c *IMAPClient) SearchPage(ctx context.Context, folder string, criteria Sea
 	c.logger.Debug("searching", "folder", folder)
 
 	if _, err := c.client.Select(folder, nil).Wait(); err != nil {
+		if isNoSuchMailbox(err) {
+			return EnvelopePage{}, fmt.Errorf("folder %q: %w", folder, ErrNotFound)
+		}
 		return EnvelopePage{}, fmt.Errorf("SELECT %s: %w", folder, err)
 	}
 
@@ -567,7 +626,7 @@ func (c *IMAPClient) SearchPage(ctx context.Context, folder string, criteria Sea
 
 	envelopes := make([]Envelope, 0, len(messages))
 	for i := len(messages) - 1; i >= 0; i-- {
-		envelopes = append(envelopes, imapEnvelopeToEnvelope(messages[i]))
+		envelopes = append(envelopes, imapEnvelopeToEnvelope(messages[i], folder))
 	}
 	page.Messages = envelopes
 	return page, nil
@@ -674,6 +733,33 @@ func (c *IMAPClient) searchAndCollect(ctx context.Context, folder string, sc *im
 	}
 }
 
+// SelectableFolders names every folder that can actually hold messages. It is
+// ListFolders minus the ones a server reports \Noselect, which are containers
+// for other folders and cannot be selected, let alone searched.
+//
+// Nothing else is filtered. A server that presents a virtual folder holding
+// copies of everything, as Gmail's All Mail does, will have it listed here and
+// a search across all folders will find each message twice: once where it
+// lives and once there. Leaving it out would make "all folders" untrue in a
+// way the caller could not see.
+func (c *IMAPClient) SelectableFolders(ctx context.Context) ([]string, error) {
+	folders, err := c.ListFolders(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, 0, len(folders))
+	for _, f := range folders {
+		if slices.ContainsFunc(f.Attributes, func(a string) bool {
+			return strings.EqualFold(a, "\\Noselect")
+		}) {
+			continue
+		}
+		names = append(names, f.Name)
+	}
+	return names, nil
+}
+
 func (c *IMAPClient) FindSpecialFolder(ctx context.Context, attr string) (string, error) {
 	// An explicit override wins outright, including over what the server
 	// advertises. It exists precisely for accounts where that is wrong, so
@@ -735,7 +821,7 @@ func toUIDSet(uids []uint32) imap.UIDSet {
 	return imap.UIDSetNum(imapUIDs...)
 }
 
-func imapEnvelopeToEnvelope(msg *imapclient.FetchMessageBuffer) Envelope {
+func imapEnvelopeToEnvelope(msg *imapclient.FetchMessageBuffer, folder string) Envelope {
 	env := msg.Envelope
 
 	from := Address{}
@@ -774,6 +860,7 @@ func imapEnvelopeToEnvelope(msg *imapclient.FetchMessageBuffer) Envelope {
 
 	return Envelope{
 		UID:     uint32(msg.UID),
+		Folder:  folder,
 		Subject: subject,
 		From:    from,
 		To:      to,

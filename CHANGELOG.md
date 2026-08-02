@@ -6,6 +6,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-08-02
+
+### Added
+
+- `search --folder` is repeatable, and `search --all-folders` covers every
+  folder the server will let us select. Triage across folders no longer needs
+  one invocation per folder. Results are merged by date, and `--limit` and
+  `--with-total` apply to the merged set.
+- `mail.SearchFoldersPage` and `mail.SelectableFolders`.
+- `Envelope.Folder` records where the message is. A UID identifies a message
+  only within one mailbox, so a merged result cannot be acted on without it.
+  It is set for every listing and search, not just the merged ones.
+
+### Fixed
+
+- `search` on a folder that does not exist now reports `NOT_FOUND`, as `inbox`
+  already did, rather than a bare SELECT failure.
+
 ## [1.20.0] - 2026-08-02
 
 A batch of small correctness fixes that had accumulated (T-026).
@@ -482,7 +500,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.20.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.21.0...HEAD
+[1.21.0]: https://github.com/lgforsberg/bifrost/compare/v1.20.0...v1.21.0
 [1.20.0]: https://github.com/lgforsberg/bifrost/compare/v1.19.0...v1.20.0
 [1.19.0]: https://github.com/lgforsberg/bifrost/compare/v1.18.0...v1.19.0
 [1.18.0]: https://github.com/lgforsberg/bifrost/compare/v1.17.1...v1.18.0

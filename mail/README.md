@@ -60,6 +60,7 @@ Lightweight message metadata from IMAP FETCH (no body content).
 ```go
 type Envelope struct {
     UID     uint32    `json:"uid"`
+    Folder  string    `json:"folder,omitempty"`
     Subject string    `json:"subject"`
     From    Address   `json:"from"`
     To      []Address `json:"to"`
@@ -201,9 +202,12 @@ func (c *IMAPClient) Close() error
 
 ```go
 func (c *IMAPClient) ListFolders(ctx context.Context) ([]Folder, error)
+func (c *IMAPClient) SelectableFolders(ctx context.Context) ([]string, error)
 func (c *IMAPClient) ListEnvelopes(ctx context.Context, folder string, limit, offset int) ([]Envelope, error)
 func (c *IMAPClient) FolderStatus(ctx context.Context, folder string) (FolderStatus, error)
 ```
+
+`SelectableFolders` is `ListFolders` reduced to the names that can hold messages, dropping the `\Noselect` containers. Nothing else is filtered, so a server with a virtual folder holding copies of everything (Gmail's All Mail) will have it in the list.
 
 `ListEnvelopes` returns newest-first, supporting pagination via `offset`.
 
@@ -259,9 +263,12 @@ func (c *IMAPClient) CheckUIDsExist(ctx context.Context, folder string, uids []u
 func (c *IMAPClient) FetchRaw(ctx context.Context, folder string, uid uint32, peek bool) ([]byte, error)
 func (c *IMAPClient) ListEnvelopePage(ctx context.Context, folder string, limit, offset int) (EnvelopePage, error)
 func (c *IMAPClient) SearchPage(ctx context.Context, folder string, criteria SearchCriteria) (EnvelopePage, error)
+func (c *IMAPClient) SearchFoldersPage(ctx context.Context, folders []string, criteria SearchCriteria) (EnvelopePage, error)
 ```
 
 `AppendMessage` returns the server-assigned UID (via UIDPLUS). `CheckUIDsExist` returns the subset of UIDs that exist in the folder.
+
+`SearchFoldersPage` runs one search over several folders and merges the results, ordered by date and limited across the merge rather than per folder. `Total` counts every match in every folder. The folders are searched in turn on the one connection, IMAP having a single selected mailbox. Every `Envelope` carries its `Folder`, which a merged result cannot be acted on without: a UID identifies a message only inside one mailbox.
 
 `FetchRaw` returns the message source unparsed, for archiving a `.eml`, forwarding whole, or inspecting a message that `FetchMessage` cannot make sense of.
 

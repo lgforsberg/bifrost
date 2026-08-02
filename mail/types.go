@@ -63,7 +63,12 @@ func (a *AccountConfig) EffectiveUsername() string {
 }
 
 type Envelope struct {
-	UID     uint32    `json:"uid"`
+	UID uint32 `json:"uid"`
+
+	// Folder is where UID means something. A UID identifies a message only
+	// within one mailbox, so a result that has been merged across several is
+	// not actionable without it.
+	Folder  string    `json:"folder,omitempty"`
 	Subject string    `json:"subject"`
 	From    Address   `json:"from"`
 	To      []Address `json:"to"`

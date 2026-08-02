@@ -278,7 +278,7 @@ In table mode the warnings go to stderr, so a piped body is still just a body. A
 #### `search` — Server-side IMAP search
 
 ```
-bifrost search [--folder FOLDER] [--from X] [--to X] [--subject X] [--body X]
+bifrost search [--folder FOLDER]... [--all-folders] [--from X] [--to X] [--subject X] [--body X]
                [--since YYYY-MM-DD] [--before YYYY-MM-DD] [--unread] [--flagged]
                [--keyword KEYWORD]... [--limit N] [--with-total]
 ```
@@ -287,7 +287,8 @@ At least one search criterion is required.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--folder` | `INBOX` | Folder to search |
+| `--folder` | `INBOX` | Folder to search, repeatable |
+| `--all-folders` | `false` | Search every folder that can be selected |
 | `--from` / `--to` / `--subject` / `--body` | — | Header and full-text matches |
 | `--since` / `--before` | — | Date range |
 | `--unread` | `false` | Only unseen messages |
@@ -303,6 +304,28 @@ bifrost --json search --folder Drafts --keyword '$PendingApproval'
 ```
 
 Quote the keyword in a shell, or `$PendingApproval` expands to nothing.
+
+##### Searching more than one folder
+
+`--folder` repeats, and `--all-folders` covers everything the server will let us select:
+
+```bash
+bifrost --json search --subject invoice --folder INBOX --folder Archive
+bifrost --json search --subject invoice --all-folders
+```
+
+Every result carries the folder it came from. That is not decoration: a UID only means something inside one mailbox, so `read`, `move` and the rest need it to act on a merged result.
+
+```bash
+bifrost --json search --subject invoice --all-folders |
+  jq -r '.[] | "\(.folder)\t\(.uid)\t\(.subject)"'
+```
+
+Merged results are ordered by date, oldest first, the same as a single-folder search. `--limit` applies to the merged set, so `--limit 10` gives the ten most recent matches across all the folders rather than ten from each. With `--with-total`, `total` counts every match everywhere.
+
+The folders are searched one after another on the same connection, IMAP having one selected mailbox at a time, so an account with many folders takes proportionally longer. `--all-folders` and `--folder` ask for different things and cannot be combined.
+
+Nothing is quietly excluded from `--all-folders` except folders the server marks unselectable, which cannot be searched at all. On a server that presents a virtual folder holding copies of everything, as Gmail's All Mail does, each message will be found twice: once where it lives and once there. Name the folders you want with `--folder` to avoid it.
 
 #### Knowing when there is more
 
