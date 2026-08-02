@@ -3,7 +3,7 @@ package mail
 import (
 	"bytes"
 	"net/netip"
-	"os"
+	"strings"
 	"time"
 
 	"github.com/emersion/go-message/mail"
@@ -28,7 +28,7 @@ func composeMessage(opts SendOptions, includeBcc bool) ([]byte, error) {
 	h.SetDate(time.Now().UTC())
 	msgID := opts.MessageID
 	if msgID == "" {
-		msgID = generateMessageID()
+		msgID = messageIDFor(opts.From.Address)
 	}
 	h.SetMessageID(msgID)
 	h.SetSubject(opts.Subject)
@@ -187,12 +187,27 @@ func writeInlinePart(iw *mail.InlineWriter, contentType, body string) error {
 	return pw.Close()
 }
 
-func generateMessageID() string {
-	hostname, err := os.Hostname()
-	if err != nil || hostname == "" || isIPAddr(hostname) {
-		hostname = "bifrost.local"
+// fallbackMessageIDDomain is used when the sender's address yields nothing
+// usable. It is deliberately not the machine's name.
+const fallbackMessageIDDomain = "bifrost.local"
+
+// messageIDFor builds a Message-ID for mail sent from address.
+//
+// The right hand side is the sender's own domain, which is what RFC 5322 asks
+// for: a domain the sender is entitled to speak for. It used to be the
+// machine's hostname, which put the name of a laptop or an internal server
+// into a header that every recipient keeps forever, and told them nothing
+// they could use.
+func messageIDFor(address string) string {
+	_, _, domain := ParsePlusAddress(address)
+	domain = strings.Trim(strings.TrimSpace(domain), "[]")
+
+	// An address literal is a legal domain but a poor identifier: it is not
+	// stable, not the sender's to claim, and filters treat it with suspicion.
+	if domain == "" || isIPAddr(domain) || strings.ContainsAny(domain, " <>@\"") {
+		domain = fallbackMessageIDDomain
 	}
-	return uuid.New().String() + "@" + hostname
+	return uuid.New().String() + "@" + domain
 }
 
 func isIPAddr(s string) bool {

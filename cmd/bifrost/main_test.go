@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
@@ -147,6 +148,189 @@ func TestWantsHelp(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if got := wantsHelp(tt.args); got != tt.want {
 				t.Errorf("wantsHelp(%q) = %v, want %v", tt.args, got, tt.want)
+			}
+		})
+	}
+}
+
+// The global flags are parsed by hand rather than by the flag package, so
+// every form the flag package would accept has to be checked here.
+func TestParseGlobalFlags(t *testing.T) {
+	tests := map[string]struct {
+		args        []string
+		wantAccount string
+		wantConfig  string
+		wantJSON    bool
+		wantVerbose bool
+		wantRest    []string
+		wantErr     string
+	}{
+		"nothing": {
+			args: nil,
+		},
+		"command only": {
+			args:     []string{"inbox"},
+			wantRest: []string{"inbox"},
+		},
+		"separate value": {
+			args:        []string{"--account", "alice", "inbox"},
+			wantAccount: "alice",
+			wantRest:    []string{"inbox"},
+		},
+		"attached value": {
+			args:        []string{"--account=alice", "inbox"},
+			wantAccount: "alice",
+			wantRest:    []string{"inbox"},
+		},
+		"one dash is the same as two": {
+			args:        []string{"-account", "alice", "-json", "inbox"},
+			wantAccount: "alice",
+			wantJSON:    true,
+			wantRest:    []string{"inbox"},
+		},
+		"a value may look like a flag": {
+			args:       []string{"--config", "--weird.json", "inbox"},
+			wantConfig: "--weird.json",
+			wantRest:   []string{"inbox"},
+		},
+		"booleans take an explicit value": {
+			args:     []string{"--json=false", "--verbose=true", "inbox"},
+			wantJSON: false, wantVerbose: true,
+			wantRest: []string{"inbox"},
+		},
+		"the command's own flags are left alone": {
+			args:     []string{"--json", "search", "--json", "--limit", "5"},
+			wantJSON: true,
+			wantRest: []string{"search", "--json", "--limit", "5"},
+		},
+		"end of flags": {
+			args:     []string{"--json", "--", "inbox"},
+			wantJSON: true,
+			wantRest: []string{"inbox"},
+		},
+		"help passes through to be dispatched": {
+			args:     []string{"--help"},
+			wantRest: []string{"--help"},
+		},
+		"short help passes through": {
+			args:     []string{"-h"},
+			wantRest: []string{"-h"},
+		},
+
+		"a missing value is not silently ignored": {
+			args:    []string{"--account"},
+			wantErr: `usage: --account needs a value`,
+		},
+		"a missing config value is not silently ignored": {
+			args:    []string{"--config"},
+			wantErr: `usage: --config needs a value`,
+		},
+		"an empty value is a mistake too": {
+			args:    []string{"--account=", "inbox"},
+			wantErr: `usage: --account was given an empty value`,
+		},
+		"an unparseable boolean": {
+			args:    []string{"--json=maybe", "inbox"},
+			wantErr: `usage: --json takes true or false, not "maybe"`,
+		},
+		"an unknown global option is named as such": {
+			args:    []string{"--bogus", "inbox"},
+			wantErr: `usage: unknown global option "--bogus"`,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			g, rest, err := parseGlobalFlags(tt.args)
+
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("parseGlobalFlags(%q) succeeded, want %q", tt.args, tt.wantErr)
+				}
+				if err.Error() != tt.wantErr {
+					t.Errorf("error = %q, want %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseGlobalFlags(%q): %v", tt.args, err)
+			}
+
+			if g.Account != tt.wantAccount {
+				t.Errorf("account = %q, want %q", g.Account, tt.wantAccount)
+			}
+			if g.ConfigPath != tt.wantConfig {
+				t.Errorf("config = %q, want %q", g.ConfigPath, tt.wantConfig)
+			}
+			if g.JSON != tt.wantJSON {
+				t.Errorf("json = %v, want %v", g.JSON, tt.wantJSON)
+			}
+			if g.Verbose != tt.wantVerbose {
+				t.Errorf("verbose = %v, want %v", g.Verbose, tt.wantVerbose)
+			}
+			if !slices.Equal(rest, tt.wantRest) {
+				t.Errorf("rest = %q, want %q", rest, tt.wantRest)
+			}
+		})
+	}
+}
+
+// Every usage error the parser reports has to carry the prefix that maps it to
+// exit code 2, or a caller cannot tell a mistyped invocation from a failed one.
+func TestParseGlobalFlags_ErrorsExitTwo(t *testing.T) {
+	for _, args := range [][]string{
+		{"--account"},
+		{"--config"},
+		{"--account="},
+		{"--json=maybe"},
+		{"--bogus"},
+	} {
+		_, _, err := parseGlobalFlags(args)
+		if err == nil {
+			t.Fatalf("parseGlobalFlags(%q) succeeded, want a usage error", args)
+		}
+		_, exit, _ := classifyError(&cmdutil.GlobalFlags{}, err)
+		if exit != 2 {
+			t.Errorf("parseGlobalFlags(%q) error %q exits %d, want 2", args, err, exit)
+		}
+	}
+}
+
+func TestDescribeBuild(t *testing.T) {
+	got := describeBuild()
+
+	// Whatever the toolchain stamped, the binary must be able to name a
+	// version rather than an empty string.
+	if got.Version == "" {
+		t.Error("describeBuild reported no version at all")
+	}
+
+	// A modified tree is not the tag it sits on, so the constant has to win
+	// there or a development build reports the previous release.
+	if got.Modified && got.Version != version {
+		t.Errorf("version = %q on a modified tree, want the constant %q", got.Version, version)
+	}
+
+	for name, tt := range map[string]struct {
+		build buildInfo
+		want  string
+	}{
+		"no commit to add": {
+			build: buildInfo{Version: "1.2.3"},
+			want:  "1.2.3",
+		},
+		"a commit is shortened": {
+			build: buildInfo{Version: "1.2.3", Revision: "db07a1ba22f23e39a4f46cf0064ff7f083ca90ec"},
+			want:  "1.2.3 (db07a1ba22f2)",
+		},
+		"an unclean tree says so": {
+			build: buildInfo{Version: "1.2.3", Revision: "db07a1ba22f23e39", Modified: true},
+			want:  "1.2.3 (db07a1ba22f2, modified)",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := tt.build.String(); got != tt.want {
+				t.Errorf("String() = %q, want %q", got, tt.want)
 			}
 		})
 	}

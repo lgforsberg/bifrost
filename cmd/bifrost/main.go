@@ -8,6 +8,9 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"regexp"
+	"runtime/debug"
+	"strconv"
 	"strings"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
@@ -17,10 +20,78 @@ import (
 	"github.com/lgforsberg/bifrost/mail"
 )
 
-const version = "1.19.0"
+// version is what this binary claims to be when the build carries no module
+// version of its own, which is the case for every build made from a source
+// tree rather than resolved from a tag.
+const version = "1.20.0"
+
+// buildInfo is what the running binary actually is. Revision and Modified come
+// from the VCS stamps the toolchain embeds and are absent from a build made
+// outside a repository, which is why both are omitted when empty.
+type buildInfo struct {
+	Version  string `json:"version"`
+	Revision string `json:"revision,omitempty"`
+	Modified bool   `json:"modified,omitempty"`
+}
+
+// releaseTag matches the version of a build made from a released tag. The
+// toolchain also reports pseudo-versions, which encode a timestamp and a
+// commit for anything built between tags, and appends +dirty to either when
+// the tree has uncommitted changes. Neither is a release, and neither matches.
+var releaseTag = regexp.MustCompile(`^v\d+\.\d+\.\d+$`)
+
+// describeBuild reports what this binary actually is: a version, and the
+// commit it came from when there is one.
+//
+// The version stamped in by the toolchain wins over the constant, but only for
+// a clean build at a release tag. There it is the better answer, because it
+// comes from the tag itself and so cannot drift the way a hand-maintained
+// constant can. Anywhere else it describes the last tag rather than the source
+// that was compiled, which during development is the previous release: the
+// constant is what the working tree claims to be, and the commit alongside it
+// says which tree that was.
+func describeBuild() buildInfo {
+	b := buildInfo{Version: version}
+
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return b
+	}
+
+	for _, setting := range info.Settings {
+		switch setting.Key {
+		case "vcs.revision":
+			b.Revision = setting.Value
+		case "vcs.modified":
+			b.Modified = setting.Value == "true"
+		}
+	}
+
+	if !b.Modified && releaseTag.MatchString(info.Main.Version) {
+		b.Version = strings.TrimPrefix(info.Main.Version, "v")
+	}
+	return b
+}
+
+// String renders the build for a person to read, naming the commit only when
+// there is one and it says something the version does not.
+func (b buildInfo) String() string {
+	if b.Revision == "" {
+		return b.Version
+	}
+
+	short := b.Revision
+	if len(short) > 12 {
+		short = short[:12]
+	}
+	if b.Modified {
+		return fmt.Sprintf("%s (%s, modified)", b.Version, short)
+	}
+	return fmt.Sprintf("%s (%s)", b.Version, short)
+}
 
 func main() {
-	globals, args := parseGlobalFlags(os.Args[1:])
+	globals, args, flagErr := parseGlobalFlags(os.Args[1:])
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -34,6 +105,12 @@ func main() {
 	}
 	globals.Logger = slog.New(handler)
 
+	// Reported only now, so a --json that was parsed before the bad flag still
+	// decides the shape of the complaint.
+	if flagErr != nil {
+		handleError(&globals, flagErr)
+	}
+
 	if len(args) == 0 {
 		printUsage()
 		os.Exit(2)
@@ -44,10 +121,11 @@ func main() {
 
 	switch cmd {
 	case "version":
+		build := describeBuild()
 		if globals.JSON {
-			_ = output.PrintJSON(os.Stdout, map[string]string{"version": version})
+			_ = output.PrintJSON(globals.Out(), build)
 		} else {
-			fmt.Printf("bifrost %s\n", version)
+			fmt.Fprintf(globals.Out(), "bifrost %s\n", build)
 		}
 		return
 	case "help", "--help", "-h":
@@ -120,32 +198,97 @@ func main() {
 	}
 }
 
-func parseGlobalFlags(args []string) (cmdutil.GlobalFlags, []string) {
+// parseGlobalFlags consumes the flags that precede the command name and hands
+// back everything from the command onwards untouched, so a subcommand's own
+// flags reach its flag set exactly as they were written.
+//
+// Both --flag value and --flag=value are taken, with one dash or two, matching
+// what the flag package accepts for every other flag in the program. A flag
+// that needs a value and is not given one is an error: it used to be ignored,
+// which turned `bifrost --account send ...` into a message sent from the
+// default account rather than a complaint about the missing name.
+func parseGlobalFlags(args []string) (cmdutil.GlobalFlags, []string, error) {
 	var g cmdutil.GlobalFlags
-	var remaining []string
 
 	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--account":
-			if i+1 < len(args) {
+		if args[i] == "--" {
+			return g, args[i+1:], nil
+		}
+
+		name, value, hasValue := splitFlag(args[i])
+
+		// Reads the value for a flag that takes one, from after the equals
+		// sign or from the next argument. An empty one is refused as firmly
+		// as a missing one: `--account="$ACCT"` with the variable unset is
+		// the same mistake arriving by a different route, and letting it
+		// through would quietly use the default account.
+		takeValue := func() error {
+			if !hasValue {
+				if i+1 >= len(args) {
+					return fmt.Errorf("usage: --%s needs a value", name)
+				}
 				i++
-				g.Account = args[i]
+				value = args[i]
 			}
-		case "--json":
-			g.JSON = true
-		case "--verbose":
-			g.Verbose = true
-		case "--config":
-			if i+1 < len(args) {
-				i++
-				g.ConfigPath = args[i]
+			if value == "" {
+				return fmt.Errorf("usage: --%s was given an empty value", name)
 			}
+			return nil
+		}
+
+		switch name {
+		case "json", "verbose":
+			on := true
+			if hasValue {
+				parsed, err := strconv.ParseBool(value)
+				if err != nil {
+					return g, nil, fmt.Errorf("usage: --%s takes true or false, not %q", name, value)
+				}
+				on = parsed
+			}
+			if name == "json" {
+				g.JSON = on
+			} else {
+				g.Verbose = on
+			}
+		case "account":
+			if err := takeValue(); err != nil {
+				return g, nil, err
+			}
+			g.Account = value
+		case "config":
+			if err := takeValue(); err != nil {
+				return g, nil, err
+			}
+			g.ConfigPath = value
+		case "help", "h":
+			// Dispatched as a command of its own, so it passes through.
+			return g, args[i:], nil
 		default:
-			remaining = append(remaining, args[i:]...)
-			return g, remaining
+			// Anything shaped like a flag in this position was meant to be a
+			// global one. Passing it on makes it the command name, and the
+			// failure that follows is about the config rather than the typo.
+			if name != "" {
+				return g, nil, fmt.Errorf("usage: unknown global option %q", args[i])
+			}
+			return g, args[i:], nil
 		}
 	}
-	return g, remaining
+	return g, nil, nil
+}
+
+// splitFlag breaks an argument into a flag name and, if it carried one after
+// an equals sign, its value. Anything that is not a flag reports an empty
+// name, which no case matches.
+func splitFlag(arg string) (name, value string, hasValue bool) {
+	if len(arg) < 2 || arg[0] != '-' {
+		return "", "", false
+	}
+	name = strings.TrimPrefix(arg[1:], "-")
+	if i := strings.IndexByte(name, '='); i >= 0 {
+		return name[:i], name[i+1:], true
+	}
+	return name, "", false
 }
 
 // wantsHelp reports whether the arguments ask what a command takes rather than

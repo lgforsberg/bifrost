@@ -6,6 +6,41 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-08-02
+
+A batch of small correctness fixes that had accumulated (T-026).
+
+### Fixed
+
+- Outgoing messages no longer disclose the sending machine's hostname. The
+  Message-ID now uses the sender's own domain, which is what RFC 5322 asks for
+  and what the recipient already knows.
+- A global flag given no value was silently ignored, so `bifrost --account
+  send ...` sent from the default account instead of complaining. A missing or
+  empty value is now a usage error, which also catches `--account "$ACCT"`
+  with the variable unset.
+- `--flag=value` and single-dash `-flag` now work for the global flags, as
+  they already did for every command flag. An unrecognised global option is
+  named as such rather than becoming the command name and failing with a
+  confusing config error.
+- Table output truncated subjects and sender names by bytes, cutting
+  multi-byte characters in half and shortening any non-Latin subject to a
+  fraction of its column. It now counts characters, and no longer panics on a
+  limit below three.
+- `Envelope.Size` is clamped rather than wrapped when a server reports a size
+  that will not fit in a `uint32`.
+- Content type detection used a hand-rolled extension split that returned
+  nonsense for a filename with no extension but a dot in its directory.
+
+### Added
+
+- `mail.GenerateMessageIDFor`, which takes the sender's address.
+  `mail.GenerateMessageID` is deprecated: it has no sender to derive a domain
+  from.
+- `version` reports the commit the binary was built from, and whether the tree
+  was modified. A version stamped in by the toolchain is preferred over the
+  constant, since it cannot drift from the tag.
+
 ## [1.19.0] - 2026-08-02
 
 ### Added
@@ -447,7 +482,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.19.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.20.0...HEAD
+[1.20.0]: https://github.com/lgforsberg/bifrost/compare/v1.19.0...v1.20.0
 [1.19.0]: https://github.com/lgforsberg/bifrost/compare/v1.18.0...v1.19.0
 [1.18.0]: https://github.com/lgforsberg/bifrost/compare/v1.17.1...v1.18.0
 [1.17.1]: https://github.com/lgforsberg/bifrost/compare/v1.17.0...v1.17.1

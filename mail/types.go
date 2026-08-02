@@ -211,9 +211,22 @@ func NormalizeAddressLower(addr string) string {
 	return strings.ToLower(NormalizeAddress(addr))
 }
 
-// GenerateMessageID creates a globally unique Message-ID for email headers.
+// GenerateMessageIDFor creates a Message-ID for mail sent from address, using
+// the sender's own domain on the right hand side. That is the domain RFC 5322
+// asks for, and unlike a hostname it discloses nothing the recipient did not
+// already have.
+func GenerateMessageIDFor(address string) string {
+	return messageIDFor(address)
+}
+
+// GenerateMessageID creates a Message-ID with no sender to derive a domain
+// from, so it falls back to a fixed one.
+//
+// Deprecated: use GenerateMessageIDFor, which produces an ID rooted in the
+// sender's domain. This once used the machine's hostname, which leaked the
+// name of the sending host into a header every recipient keeps.
 func GenerateMessageID() string {
-	return generateMessageID()
+	return messageIDFor("")
 }
 
 // ParsePlusAddress splits an address into local part, tag, and domain.

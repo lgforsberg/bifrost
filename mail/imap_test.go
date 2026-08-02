@@ -3,6 +3,7 @@ package mail
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -139,6 +140,29 @@ func TestClassifyFolderError(t *testing.T) {
 			}
 			if !strings.Contains(got.Error(), tt.wantContains) {
 				t.Errorf("error %q should contain %q", got.Error(), tt.wantContains)
+			}
+		})
+	}
+}
+
+// The protocol hands sizes over as int64 and counts as int. Wrapping a value
+// that does not fit would turn an implausibly large number into a small and
+// entirely plausible one.
+func TestClampToUint32(t *testing.T) {
+	for name, tc := range map[string]struct {
+		in   int64
+		want uint32
+	}{
+		"an ordinary size":       {in: 4096, want: 4096},
+		"zero":                   {in: 0, want: 0},
+		"the largest that fits":  {in: math.MaxUint32, want: math.MaxUint32},
+		"one too many saturates": {in: math.MaxUint32 + 1, want: math.MaxUint32},
+		"far too many":           {in: math.MaxInt64, want: math.MaxUint32},
+		"a negative reads as none rather than as four billion": {in: -1, want: 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := clampToUint32(tc.in); got != tc.want {
+				t.Errorf("clampToUint32(%d) = %d, want %d", tc.in, got, tc.want)
 			}
 		})
 	}

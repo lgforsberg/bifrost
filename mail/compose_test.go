@@ -2,6 +2,7 @@ package mail
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 )
@@ -100,6 +101,83 @@ func TestComposeMessage_KeepsASuppliedTextBody(t *testing.T) {
 	}
 	if strings.Contains(parsed.TextBody, "Different words") {
 		t.Errorf("text body %q picked up the HTML", parsed.TextBody)
+	}
+}
+
+// The Message-ID used to carry os.Hostname(), which put the name of a laptop
+// or an internal server into a header every recipient keeps forever.
+func TestMessageIDFor(t *testing.T) {
+	host, err := os.Hostname()
+	if err != nil {
+		t.Skip("no hostname to check against")
+	}
+
+	for name, tc := range map[string]struct{ address, want string }{
+		"the sender's domain": {
+			address: "alice@example.com", want: "example.com",
+		},
+		"a plus tag does not change the domain": {
+			address: "alice+receipts@example.com", want: "example.com",
+		},
+		"a subdomain is kept whole": {
+			address: "alice@mail.corp.example.com", want: "mail.corp.example.com",
+		},
+		"no address to work from": {
+			address: "", want: fallbackMessageIDDomain,
+		},
+		"not an address at all": {
+			address: "alice", want: fallbackMessageIDDomain,
+		},
+		"an address literal is not an identifier": {
+			address: "alice@[192.168.1.10]", want: fallbackMessageIDDomain,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			id := messageIDFor(tc.address)
+
+			_, domain, found := strings.Cut(id, "@")
+			if !found {
+				t.Fatalf("messageIDFor(%q) = %q, which has no domain", tc.address, id)
+			}
+			if domain != tc.want {
+				t.Errorf("messageIDFor(%q) domain = %q, want %q", tc.address, domain, tc.want)
+			}
+			if host != "" && strings.Contains(id, host) {
+				t.Errorf("messageIDFor(%q) = %q, which discloses the hostname", tc.address, id)
+			}
+		})
+	}
+}
+
+// Two messages must never share an ID, whatever the domain resolves to.
+func TestMessageIDFor_IsUnique(t *testing.T) {
+	seen := make(map[string]bool, 100)
+	for range 100 {
+		id := messageIDFor("alice@example.com")
+		if seen[id] {
+			t.Fatalf("messageIDFor produced %q twice", id)
+		}
+		seen[id] = true
+	}
+}
+
+func TestComposeMessage_RootsTheMessageIDInTheSenderDomain(t *testing.T) {
+	data, err := ComposeMessage(SendOptions{
+		From:     Address{Address: "alice@example.com"},
+		To:       []Address{{Address: "bob@elsewhere.net"}},
+		Subject:  "Hello",
+		TextBody: "Hi",
+	})
+	if err != nil {
+		t.Fatalf("ComposeMessage: %v", err)
+	}
+
+	raw := string(data)
+	if !strings.Contains(raw, "@example.com>") {
+		t.Errorf("no Message-ID rooted in the sender's domain:\n%s", raw)
+	}
+	if host, err := os.Hostname(); err == nil && host != "" && strings.Contains(raw, host) {
+		t.Errorf("the composed message discloses the hostname %q", host)
 	}
 }
 

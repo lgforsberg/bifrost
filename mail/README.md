@@ -389,8 +389,11 @@ func QuoteBodyHTML(original *Message) string
 func NormalizeAddress(addr string) string       // "user+tag@domain" → "user@domain"
 func NormalizeAddressLower(addr string) string  // same, lowercased
 func ParsePlusAddress(addr string) (local, tag, domain string)
-func GenerateMessageID() string
+func GenerateMessageIDFor(address string) string
+func GenerateMessageID() string // deprecated
 ```
+
+`GenerateMessageIDFor` roots the Message-ID in the sender's own domain, which is the domain RFC 5322 asks for. `GenerateMessageID` has no sender to derive one from and falls back to a fixed domain; it once used the machine's hostname, which put the name of the sending host into a header every recipient keeps. `Send`, `SendDraft` and `ComposeMessage` all use the sender's domain and need no help from either.
 
 ---
 

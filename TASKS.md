@@ -106,12 +106,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   distant thread members), envelope-only discovery instead of full-body fetches, and
   `slices.SortFunc` over the hand-rolled insertion sort.
   ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/imap.go:FetchThread`
-- **T-026** Code hygiene batch: rune-safe `truncate`; `filepath.Ext` over `fileExtension`;
-  unchecked `int64`→`uint32` casts; global flag parser silently drops a missing
-  `--account`/`--config` value; version from build info instead of a hand-maintained const;
-  Message-ID should not embed the real hostname.
-  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `internal/commands/inbox.go:78`
-
 ## GATED
 
 - **T-027** 🧭 OAuth2 (XOAUTH2/OAUTHBEARER) for IMAP and SMTP; Gmail and Microsoft 365 have
@@ -134,6 +128,15 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-026** Code hygiene batch, all six items. Message-ID uses the sender's domain instead of the
+  machine's hostname; the global flag parser rejects a missing, empty or unknown option instead of
+  ignoring it, and takes `--flag=value` and `-flag`; `truncate` counts runes; `Envelope.Size`
+  clamps rather than wraps; `filepath.Ext` replaces the hand-rolled split; `version` reports the
+  commit. One listed item, the `uint32` cast in `ParseUIDs`, was already safe: `ParseUint` with
+  bitSize 32 rejects overflow before the conversion.
+  ↳ done 2026-08-02 · evidence: table-driven tests for the parser (15 cases), truncate (11), the
+  Message-ID domain (6) and the clamp (6), plus a check that every parser usage error still maps
+  to exit code 2. v1.20.0
 - **T-020** `--body-html` / `--body-html-file` on all four composing commands, registered once in
   `helpers.RegisterBodyFlags` rather than a fifth copy of the same flag-set dance. Composition
   derives the plain-text alternative when only HTML is given, and `QuoteBodyHTML` quotes the

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net"
 	"strconv"
 	"strings"
@@ -534,7 +535,7 @@ func (c *IMAPClient) SearchPage(ctx context.Context, folder string, criteria Sea
 
 	allUIDs := data.AllUIDs()
 	page := EnvelopePage{
-		Total:    uint32(len(allUIDs)),
+		Total:    clampToUint32(int64(len(allUIDs))),
 		Limit:    criteria.Limit,
 		Messages: []Envelope{},
 	}
@@ -779,7 +780,7 @@ func imapEnvelopeToEnvelope(msg *imapclient.FetchMessageBuffer) Envelope {
 		Cc:      cc,
 		Date:    date,
 		Flags:   flags,
-		Size:    uint32(msg.RFC822Size),
+		Size:    clampToUint32(msg.RFC822Size),
 	}
 }
 
@@ -815,6 +816,23 @@ func buildIMAPSearchCriteria(criteria SearchCriteria) *imap.SearchCriteria {
 	}
 
 	return sc
+}
+
+// clampToUint32 narrows a count or size the protocol hands over as a wider
+// type. Nothing an IMAP server legitimately reports comes near the ceiling, so
+// a value that does is a broken server or our own bug; saturating says the
+// number was too large, where wrapping would produce a small one that looks
+// entirely plausible. A negative, which only a broken server sends, reads as
+// zero rather than as four billion.
+func clampToUint32(n int64) uint32 {
+	switch {
+	case n < 0:
+		return 0
+	case n > math.MaxUint32:
+		return math.MaxUint32
+	default:
+		return uint32(n)
+	}
 }
 
 // isNoSuchMailbox reports whether the server said the mailbox is missing. The

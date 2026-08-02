@@ -3,6 +3,7 @@ package commands
 import (
 	"flag"
 	"fmt"
+	"unicode/utf8"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
 	"github.com/lgforsberg/bifrost/internal/helpers"
@@ -63,16 +64,12 @@ func Inbox(g *cmdutil.GlobalFlags, args []string) error {
 		if env.From.Name != "" {
 			from = env.From.Name
 		}
-		subject := env.Subject
-		if len(subject) > 60 {
-			subject = subject[:57] + "..."
-		}
 		rows[i] = []string{
 			fmt.Sprintf("%d", env.UID),
 			flags,
 			env.Date.Format("2006-01-02 15:04"),
 			truncate(from, 25),
-			subject,
+			truncate(env.Subject, 60),
 		}
 	}
 	output.PrintTable(g.Out(), headers, rows)
@@ -82,12 +79,29 @@ func Inbox(g *cmdutil.GlobalFlags, args []string) error {
 	return nil
 }
 
+// truncate shortens s to at most max characters, marking the cut with an
+// ellipsis. It counts runes rather than bytes: a byte slice would cut a
+// multi-byte character in half and emit the replacement glyph, and it would
+// also shorten a subject in Greek or Japanese to a fraction of the column it
+// was given. Runes are the unit fmt pads with, so this and the table agree.
 func truncate(s string, max int) string {
-	if len(s) <= max {
+	if max <= 0 {
+		return ""
+	}
+	// Counting first avoids allocating the slice for the overwhelming
+	// majority of values, which are short enough to pass through.
+	if utf8.RuneCountInString(s) <= max {
 		return s
 	}
-	return s[:max-3] + "..."
+
+	r := []rune(s)
+	if max <= len(ellipsis) {
+		return string(r[:max])
+	}
+	return string(r[:max-len(ellipsis)]) + ellipsis
 }
+
+const ellipsis = "..."
 
 // bulkResult builds a JSON response for bulk UID operations, including skipped UIDs when relevant.
 func bulkResult(status string, v *helpers.UIDValidation) map[string]any {

@@ -14,7 +14,7 @@ func Send(ctx context.Context, account AccountConfig, imap *IMAPClient, opts Sen
 	// Pinned up front so the delivered bytes and the archived Sent copy, which
 	// are composed separately, share one Message-ID.
 	if opts.MessageID == "" {
-		opts.MessageID = GenerateMessageID()
+		opts.MessageID = messageIDFor(opts.From.Address)
 	}
 	result := SendResult{MessageID: opts.MessageID}
 
@@ -264,7 +264,7 @@ func SendDraftWithOptions(ctx context.Context, account AccountConfig, imap *IMAP
 		Attachments: msg.Attachments,
 		InReplyTo:   msg.InReplyTo,
 		References:  msg.References,
-		MessageID:   GenerateMessageID(),
+		MessageID:   messageIDFor(msg.From.Address),
 	}
 
 	result := SendResult{MessageID: opts.MessageID}

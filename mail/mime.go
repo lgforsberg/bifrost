@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"path/filepath"
 	"strings"
 
 	message "github.com/emersion/go-message"
@@ -164,18 +165,9 @@ func ParseMessage(r io.Reader) (*Message, error) {
 
 // contentTypeFromFilename returns a MIME type based on file extension.
 func contentTypeFromFilename(filename string) string {
-	ct := mime.TypeByExtension("." + fileExtension(filename))
+	ct := mime.TypeByExtension(filepath.Ext(filename))
 	if ct == "" {
 		return "application/octet-stream"
 	}
 	return ct
-}
-
-func fileExtension(filename string) string {
-	for i := len(filename) - 1; i >= 0; i-- {
-		if filename[i] == '.' {
-			return filename[i+1:]
-		}
-	}
-	return ""
 }

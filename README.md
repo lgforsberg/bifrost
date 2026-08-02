@@ -141,6 +141,8 @@ bifrost [global options] <command> [command options] [arguments]
 | `--verbose` | Debug logging to stderr |
 | `--config PATH` | Config file path (default: `~/.bifrost/config.json`, env: `BIFROST_CONFIG`) |
 
+`--flag value` and `--flag=value` are both accepted, with one dash or two. A flag that takes a value and is given none, or given an empty one, is a usage error rather than a silent fallback to the default: `--account "$ACCT"` with the variable unset stops rather than sending from whichever account happens to be first.
+
 ### Exit codes
 
 | Code | Meaning |
@@ -197,6 +199,18 @@ Without `--json`, errors print to stderr as `error: <message>`.
 | `draft` | Manage drafts (save, list, send, delete) |
 | `config` | Configuration management (init) |
 | `version` / `help` | Version and usage |
+
+`version` reports the commit it was built from as well as the version, and says so when the tree had uncommitted changes, which is what makes a bug report from a local build placeable:
+
+```console
+$ bifrost version
+bifrost 1.20.0 (db07a1ba22f2, modified)
+
+$ bifrost --json version
+{"version": "1.20.0", "revision": "db07a1ba22f2...", "modified": true}
+```
+
+A binary from `go install` carries no commit and prints the version alone.
 
 #### `inbox` — List messages
 
@@ -338,7 +352,7 @@ bifrost send --to ADDR [--to ADDR...] --subject TEXT [--cc ADDR...] [--bcc ADDR.
 | `--attach` | No | Attachment file path (repeatable) |
 | `--no-save` | No | Don't save a copy to Sent |
 
-JSON output: `{"status": "sent", "messageId": "uuid@hostname"}`.
+JSON output: `{"status": "sent", "messageId": "uuid@your-domain.example"}`. The right hand side of the Message-ID is the sender's own domain, which is the domain RFC 5322 asks for and, unlike a hostname, tells the recipient nothing they did not already have.
 
 `reply`, `forward` and `draft send` report the same shape. When a step after delivery fails, such as filing the copy in Sent or removing a sent draft, the result gains a `warnings` array describing each one. The status stays `sent` and the exit code stays 0, because the message did go out and retrying would send it twice. In table mode those warnings go to stderr, leaving stdout clean.
 
