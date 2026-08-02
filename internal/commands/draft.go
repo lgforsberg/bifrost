@@ -30,7 +30,7 @@ func Draft(g *cmdutil.GlobalFlags, args []string) error {
 	case "delete":
 		return draftDelete(g, subArgs)
 	case "help", "--help", "-h":
-		return fmt.Errorf("usage: draft <save|list|send|approve|delete>")
+		return g.Usage("usage: draft <save|list|send|approve|delete>")
 	default:
 		return fmt.Errorf("usage: unknown subcommand %q (save, list, send, approve, delete)", sub)
 	}

@@ -145,9 +145,13 @@ bifrost [global options] <command> [command options] [arguments]
 
 | Code | Meaning |
 |------|---------|
-| `0` | Success |
+| `0` | Success, including anything that asked for usage |
 | `1` | Operational error (network, IMAP, SMTP, not found, etc.) |
 | `2` | Usage error (bad flags, missing arguments, invalid config) |
+
+Asking what a command takes is not a mistake, so `bifrost inbox --help` and `bifrost folder help` exit 0, while getting the invocation wrong still exits 2. Usage text goes to stderr in both cases, which is where the flag package puts it.
+
+Help also works without a usable config. Finding out what a command takes should not require an account, so a missing or broken config file is only reported when something actually needs it.
 
 ### Error format
 

@@ -20,7 +20,7 @@ func Config(g *cmdutil.GlobalFlags, args []string) error {
 	case "init":
 		return configInit(g, args[1:])
 	case "help", "--help", "-h":
-		return fmt.Errorf("usage: config <init>")
+		return g.Usage("usage: config <init>")
 	default:
 		return fmt.Errorf("usage: unknown subcommand %q (init)", args[0])
 	}

@@ -78,11 +78,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NOW
 
-- **T-039** `bifrost inbox --help` fails with a config error instead of printing the flags: config
-  is loaded during dispatch, before the subcommand parses anything, so no per-command help is
-  reachable without a working account. Discovering what a command takes should not require
-  credentials. Parse for `-h`/`--help` before loading, or defer the load until after `fs.Parse`.
-  ↳ since 2026-08-02 · pushed 0 · size S · verified 2026-08-02 · ref `cmd/bifrost/main.go` dispatch
 
 ## NEXT
 
@@ -146,6 +141,13 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-039** Per-command help works without a config, and asking for it exits 0. Two faults, not
+  one: the config load sat ahead of dispatch, and `flag.ErrHelp` fell through to the exit-2 usage
+  path so the help text arrived with `error:` underneath it. A broken config is now reported only
+  when something needs it, which keeps the error for the case that earned it.
+  ↳ done 2026-08-02 · evidence: ten `wantsHelp` cases including the false positives that would
+  hide a real config error, plus seven command tests; verified end to end against a config path
+  that does not exist. v1.17.1
 - **T-018** `folder status [name]` over IMAP STATUS: counts a mailbox without selecting it or
   fetching envelopes. `Total` and `Unseen` are `*uint32` because STATUS items are optional, and
   a server that declines to answer must not read as a confident zero.

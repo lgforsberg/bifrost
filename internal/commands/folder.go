@@ -41,7 +41,7 @@ func Folder(g *cmdutil.GlobalFlags, args []string) error {
 		}
 		return folderDelete(g, subArgs[0])
 	case "help", "--help", "-h":
-		return fmt.Errorf("usage: folder <list|status|create|rename|delete>")
+		return g.Usage("usage: folder <list|status|create|rename|delete>")
 	default:
 		return fmt.Errorf("usage: unknown subcommand %q (list, status, create, rename, delete)", sub)
 	}

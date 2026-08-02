@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -16,7 +17,7 @@ import (
 	"github.com/lgforsberg/bifrost/mail"
 )
 
-const version = "1.17.0"
+const version = "1.17.1"
 
 func main() {
 	globals, args := parseGlobalFlags(os.Args[1:])
@@ -63,8 +64,15 @@ func main() {
 
 	cfg, err := config.Load(globals.ConfigPath)
 	if err != nil {
-		handleError(&globals, err)
-		return
+		// Finding out what a command takes should not require an account.
+		// Every command parses its flags before it looks at the config, so an
+		// empty one is enough to get the usage text out; anything that
+		// actually runs still fails on the original error.
+		if !wantsHelp(cmdArgs) {
+			handleError(&globals, err)
+			return
+		}
+		cfg = &config.Config{}
 	}
 	globals.Config = cfg
 
@@ -140,7 +148,34 @@ func parseGlobalFlags(args []string) (cmdutil.GlobalFlags, []string) {
 	return g, remaining
 }
 
+// wantsHelp reports whether the arguments ask what a command takes rather than
+// asking it to do anything, which decides whether a broken config is worth
+// reporting. "help" counts only in first position, where it is a subcommand
+// (`folder help`); anywhere else it is a plausible value for a flag.
+func wantsHelp(args []string) bool {
+	if len(args) > 0 && args[0] == "help" {
+		return true
+	}
+	for _, a := range args {
+		if a == "--" {
+			return false
+		}
+		if a == "-h" || a == "--help" {
+			return true
+		}
+	}
+	return false
+}
+
 func handleError(g *cmdutil.GlobalFlags, err error) {
+	// Asking for usage is not a failure. The flag package has already written
+	// the text by this point, so there is nothing to add and nothing to
+	// report; exiting 0 is what separates "you asked" from "you got it wrong",
+	// which still exits 2.
+	if errors.Is(err, flag.ErrHelp) {
+		os.Exit(0)
+	}
+
 	code, exitCode, err := classifyError(g, err)
 
 	if g.JSON {

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -561,6 +562,49 @@ func TestFolderStatus_UnknownFolderIsNotFound(t *testing.T) {
 	err := Folder(cli.g, []string{"status", "No Such Folder"})
 	if !errors.Is(err, mail.ErrNotFound) {
 		t.Fatalf("error = %v, want ErrNotFound", err)
+	}
+}
+
+// main exits 0 on flag.ErrHelp rather than treating it as a usage error, so
+// what a command returns for --help has to keep wrapping it.
+func TestCommands_HelpReturnsErrHelp(t *testing.T) {
+	cli := newTestCLI(t)
+
+	for name, run := range map[string]func(*cmdutil.GlobalFlags, []string) error{
+		"inbox":  Inbox,
+		"read":   Read,
+		"search": Search,
+		"flag":   Flag,
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := run(cli.g, []string{"--help"})
+			if !errors.Is(err, flag.ErrHelp) {
+				t.Errorf("error = %v, want it to wrap flag.ErrHelp so main can exit 0", err)
+			}
+		})
+	}
+}
+
+// Asking a subcommand what it takes is a question, not a mistake, so it must
+// not come back as the exit-2 usage error that a wrong invocation does.
+func TestSubcommands_HelpIsNotAnError(t *testing.T) {
+	cli := newTestCLI(t)
+	cli.g.JSON = false
+
+	for name, run := range map[string]func(*cmdutil.GlobalFlags, []string) error{
+		"folder": Folder,
+		"draft":  Draft,
+		"config": Config,
+	} {
+		t.Run(name, func(t *testing.T) {
+			cli.err.Reset()
+			if err := run(cli.g, []string{"help"}); err != nil {
+				t.Fatalf("%s help returned %v, want nil", name, err)
+			}
+			if !strings.Contains(cli.err.String(), "usage:") {
+				t.Errorf("no usage text written:\n%s", cli.err.String())
+			}
+		})
 	}
 }
 

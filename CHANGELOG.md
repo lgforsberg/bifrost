@@ -6,6 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.17.1] - 2026-08-02
+
+### Fixed
+
+- `bifrost inbox --help` printed a config error instead of the flags. Config
+  was loaded during dispatch, before any command parsed its arguments, so
+  finding out what a command takes required a working account. A missing or
+  broken config is now only reported when something actually needs it.
+- Asking for usage exited 2 and printed `error: usage: flag: help requested`
+  underneath the help text. `--help` and the `help` subcommands now exit 0 and
+  say nothing extra; getting the invocation wrong still exits 2.
+
 ## [1.17.0] - 2026-08-02
 
 ### Added
@@ -399,7 +411,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.17.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.17.1...HEAD
+[1.17.1]: https://github.com/lgforsberg/bifrost/compare/v1.17.0...v1.17.1
 [1.17.0]: https://github.com/lgforsberg/bifrost/compare/v1.16.0...v1.17.0
 [1.16.0]: https://github.com/lgforsberg/bifrost/compare/v1.15.0...v1.16.0
 [1.15.0]: https://github.com/lgforsberg/bifrost/compare/v1.14.0...v1.15.0

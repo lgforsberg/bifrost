@@ -122,3 +122,32 @@ func TestClassifyError_InterruptSaysSo(t *testing.T) {
 		t.Errorf("message = %q, want %q", reported.Error(), want)
 	}
 }
+
+// wantsHelp decides whether a broken config is worth reporting, so a false
+// positive hides a real error and a false negative makes usage unreachable
+// for exactly the person who needs it.
+func TestWantsHelp(t *testing.T) {
+	tests := map[string]struct {
+		args []string
+		want bool
+	}{
+		"long form":                    {args: []string{"--help"}, want: true},
+		"short form":                   {args: []string{"-h"}, want: true},
+		"after other flags":            {args: []string{"--folder", "INBOX", "--help"}, want: true},
+		"help as a subcommand":         {args: []string{"help"}, want: true},
+		"subcommand then long form":    {args: []string{"folder", "--help"}, want: true},
+		"nothing at all":               {args: nil, want: false},
+		"ordinary work":                {args: []string{"--limit", "20"}, want: false},
+		"help as a flag value":         {args: []string{"--subject", "help"}, want: false},
+		"help as a positional":         {args: []string{"create", "help"}, want: false},
+		"after the end-of-flags guard": {args: []string{"--", "--help"}, want: false},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := wantsHelp(tt.args); got != tt.want {
+				t.Errorf("wantsHelp(%q) = %v, want %v", tt.args, got, tt.want)
+			}
+		})
+	}
+}

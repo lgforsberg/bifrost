@@ -2,6 +2,7 @@ package cmdutil
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -41,4 +42,14 @@ func (g *GlobalFlags) Err() io.Writer {
 		return os.Stderr
 	}
 	return g.Stderr
+}
+
+// Usage writes usage text and reports success, for a caller that asked what a
+// command takes. Returning an error here would exit 2, which is the code for
+// getting the invocation wrong; asking is not the same thing. It goes to
+// stderr because that is where the flag package puts the same text, and one
+// stream for all usage beats two.
+func (g *GlobalFlags) Usage(text string) error {
+	fmt.Fprintln(g.Err(), text)
+	return nil
 }
