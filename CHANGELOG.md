@@ -6,6 +6,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-08-02
+
+### Added
+
+- `read --raw` writes the RFC 822 source with no parsing in between, so
+  `read --raw 42 > message.eml` produces a file any mail client opens. Useful
+  for archiving and forwarding whole, and the only reliable view of a message
+  that does not parse. With `--json` the source is base64-encoded, since RFC
+  822 source need not be valid UTF-8 and a JSON string would silently replace
+  whatever is not. `--raw` refuses `--save-attachments` rather than accepting
+  it and leaving the directory empty.
+- `mail.IMAPClient.FetchRaw` returns the same bytes to library callers.
+
 ## [1.14.0] - 2026-08-02
 
 ### Fixed
@@ -365,7 +378,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.14.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.15.0...HEAD
+[1.15.0]: https://github.com/lgforsberg/bifrost/compare/v1.14.0...v1.15.0
 [1.14.0]: https://github.com/lgforsberg/bifrost/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/lgforsberg/bifrost/compare/v1.12.0...v1.13.0
 [1.12.0]: https://github.com/lgforsberg/bifrost/compare/v1.11.0...v1.12.0

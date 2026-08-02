@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -341,6 +342,94 @@ func TestRead_CleanMessageCarriesNoWarnings(t *testing.T) {
 
 	if warnings, present := cli.decodeObject(t)["warnings"]; present {
 		t.Errorf("warnings = %v, want the key absent for a clean message", warnings)
+	}
+}
+
+// The point of --raw is that `read --raw 42 > msg.eml` produces a file other
+// mail software opens, so stdout carries the bytes and nothing else.
+func TestRead_RawWritesTheSourceAndNothingElse(t *testing.T) {
+	cli := newTestCLI(t)
+	cli.g.JSON = false
+	source := "From: alice@example.com\r\n" +
+		"To: " + testAddress + "\r\n" +
+		"Subject: Verbatim\r\n" +
+		"\r\n" +
+		"exactly these bytes\r\n"
+	uid := cli.seedRaw(t, "INBOX", source)
+
+	if err := Read(cli.g, []string{"--raw", fmt.Sprintf("%d", uid)}); err != nil {
+		t.Fatalf("read --raw: %v", err)
+	}
+
+	got := cli.out.String()
+	if !strings.Contains(got, "Subject: Verbatim") || !strings.Contains(got, "exactly these bytes") {
+		t.Errorf("stdout is not the message source:\n%q", got)
+	}
+	// The parsed view labels its fields; the raw one must not.
+	if strings.Contains(got, "UID:") {
+		t.Errorf("stdout carries formatting that would corrupt a .eml:\n%q", got)
+	}
+}
+
+// A message that will not parse cleanly is exactly when the raw source is
+// wanted, so --raw must not go anywhere near the parser.
+func TestRead_RawWorksOnAMessageThatBarelyParses(t *testing.T) {
+	cli := newTestCLI(t)
+	cli.g.JSON = false
+	uid := cli.seedRaw(t, "INBOX", "From: alice@example.com\r\n"+
+		"Subject: Ancient client\r\n"+
+		"Content-Transfer-Encoding: x-uuencode\r\n"+
+		"\r\n"+
+		"undecodable payload\r\n")
+
+	if err := Read(cli.g, []string{"--raw", fmt.Sprintf("%d", uid)}); err != nil {
+		t.Fatalf("read --raw: %v", err)
+	}
+	if !strings.Contains(cli.out.String(), "undecodable payload") {
+		t.Errorf("stdout missing the source:\n%q", cli.out.String())
+	}
+}
+
+// JSON has to stay JSON, and the source has to survive bytes that are not
+// valid UTF-8, hence base64 rather than a string.
+func TestRead_RawJSONIsBase64(t *testing.T) {
+	cli := newTestCLI(t)
+	source := "From: alice@example.com\r\nSubject: Bytes\r\n\r\nbody\r\n"
+	uid := cli.seedRaw(t, "INBOX", source)
+
+	if err := Read(cli.g, []string{"--raw", fmt.Sprintf("%d", uid)}); err != nil {
+		t.Fatalf("read --raw: %v", err)
+	}
+
+	obj := cli.decodeObject(t)
+	encoded, ok := obj["raw"].(string)
+	if !ok {
+		t.Fatalf("raw is %T, want a base64 string", obj["raw"])
+	}
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		t.Fatalf("raw is not base64: %v", err)
+	}
+	if !strings.Contains(string(decoded), "Subject: Bytes") {
+		t.Errorf("decoded raw = %q, want the source", string(decoded))
+	}
+	if obj["size"] != float64(len(decoded)) {
+		t.Errorf("size = %v, want %d", obj["size"], len(decoded))
+	}
+}
+
+// Accepting the flag and leaving the directory empty would be worse than
+// refusing it.
+func TestRead_RawRefusesToPretendItCanSaveAttachments(t *testing.T) {
+	cli := newTestCLI(t)
+	uids := cli.seed(t, "INBOX", "Anything")
+
+	err := Read(cli.g, []string{"--raw", "--save-attachments", t.TempDir(), fmt.Sprintf("%d", uids[0])})
+	if err == nil {
+		t.Fatal("expected a usage error for --raw with --save-attachments")
+	}
+	if !strings.HasPrefix(err.Error(), "usage:") {
+		t.Errorf("error = %q, want a usage error so the exit code is 2", err)
 	}
 }
 

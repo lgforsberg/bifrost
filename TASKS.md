@@ -78,10 +78,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NOW
 
-- **T-019** `read --raw` to emit the RFC 822 source (.eml) for archival, forward-as-attachment,
-  and debugging parse issues. Pairs with T-032: when a message parses badly, the raw source is
-  how anyone sees what actually arrived.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-02 · ref `internal/commands/read.go`
 
 ## NEXT
 
@@ -157,6 +153,12 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-019** `read --raw` writes the message source unparsed. Base64 under `--json`, because RFC
+  822 source need not be valid UTF-8 and a JSON string would replace what is not; this matches
+  how attachment bytes already travel. Refuses `--save-attachments` rather than accepting a flag
+  it cannot honour. `FetchMessage` and the new `FetchRaw` share one fetch.
+  ↳ done 2026-08-02 · evidence: four command tests covering the bytes reaching stdout unadorned,
+  a barely-parsable message still dumping, the base64 shape, and the refused flag. v1.15.0
 - **T-032** Damaged messages are read for what they contain instead of refused. Re-verification
   found it worse than filed: an unknown charset or transfer encoding failed the *whole* message,
   headers included, because `mail.CreateReader` reports an error while still holding a readable

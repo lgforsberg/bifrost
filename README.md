@@ -211,13 +211,14 @@ JSON output: array of envelope objects.
 #### `read` — Read a message
 
 ```
-bifrost read [--folder FOLDER] [--peek] [--with-attachment-data] [--save-attachments DIR] <uid>
+bifrost read [--folder FOLDER] [--peek] [--raw] [--with-attachment-data] [--save-attachments DIR] <uid>
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--folder` | `INBOX` | Folder containing the message |
 | `--peek` | `false` | Don't mark the message as read |
+| `--raw` | `false` | Write the RFC 822 source instead of the parsed message |
 | `--with-attachment-data` | `false` | Include attachment bytes in JSON output |
 | `--save-attachments` | — | Save attachments to the given directory |
 
@@ -226,6 +227,20 @@ By default `read` marks the message seen. Use `--peek` (or `peekOnRead: true`) t
 Attachment bytes are left out of the JSON unless you ask for them: base64 makes a single PDF larger than the message carrying it. Each attachment's `filename`, `contentType` and `size` are always reported, so you can see what is there and then use `--save-attachments` to write the files, or `--with-attachment-data` to inline them. (`--no-attachments` still works and is now redundant.)
 
 `--save-attachments` reduces each sender-supplied filename to a bare file name, so an attachment can never be written outside the given directory. Colliding names are suffixed rather than overwritten. Files are written mode 0600 into a directory created 0700.
+
+##### Raw source
+
+`--raw` writes the message exactly as the server holds it, with no parsing in between:
+
+```bash
+bifrost read --raw 42 > message.eml
+```
+
+Nothing is added around the bytes, so the file opens in any mail client. This is the view to reach for when archiving, when forwarding a message whole, and above all when a message does not parse: it is the only one that cannot be wrong about what arrived.
+
+With `--json` the source comes back base64-encoded, as `{"uid":42,"folder":"INBOX","size":2048,"raw":"..."}`. RFC 822 source is not required to be valid UTF-8, and a JSON string would silently replace whatever is not. Attachment bytes are encoded the same way for the same reason.
+
+`--raw` never parses, so it has no attachments to write and refuses `--save-attachments` rather than leaving the directory empty. It still honours `--peek`.
 
 ##### Damaged messages
 

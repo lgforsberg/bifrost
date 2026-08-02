@@ -173,10 +173,35 @@ func (c *IMAPClient) ListEnvelopePage(ctx context.Context, folder string, limit,
 }
 
 func (c *IMAPClient) FetchMessage(ctx context.Context, folder string, uid uint32, peek bool) (*Message, error) {
+	source, env, err := c.fetchSource(ctx, folder, uid, peek)
+	if err != nil {
+		return nil, err
+	}
+
+	parsed, err := ParseMessage(bytes.NewReader(source))
+	if err != nil {
+		return nil, fmt.Errorf("parsing message uid %d: %w", uid, err)
+	}
+	parsed.Envelope = env
+	return parsed, nil
+}
+
+// FetchRaw returns the message exactly as the server holds it, RFC 822 source
+// and all. Nothing is parsed, which is the point: it archives as a .eml, it
+// forwards whole, and when a message will not parse it is the only view that
+// cannot be wrong about what arrived.
+func (c *IMAPClient) FetchRaw(ctx context.Context, folder string, uid uint32, peek bool) ([]byte, error) {
+	source, _, err := c.fetchSource(ctx, folder, uid, peek)
+	return source, err
+}
+
+// fetchSource pulls one message's bytes along with the server's own envelope,
+// which is the part FetchMessage trusts over anything it parses itself.
+func (c *IMAPClient) fetchSource(ctx context.Context, folder string, uid uint32, peek bool) ([]byte, Envelope, error) {
 	c.logger.Debug("fetching message", "folder", folder, "uid", uid, "peek", peek)
 
 	if _, err := c.client.Select(folder, nil).Wait(); err != nil {
-		return nil, fmt.Errorf("SELECT %s: %w", folder, err)
+		return nil, Envelope{}, fmt.Errorf("SELECT %s: %w", folder, err)
 	}
 
 	bodySection := &imap.FetchItemBodySection{
@@ -193,10 +218,10 @@ func (c *IMAPClient) FetchMessage(ctx context.Context, folder string, uid uint32
 	uidSet := imap.UIDSetNum(imap.UID(uid))
 	messages, err := c.client.Fetch(uidSet, fetchOpts).Collect()
 	if err != nil {
-		return nil, fmt.Errorf("FETCH uid %d: %w", uid, err)
+		return nil, Envelope{}, fmt.Errorf("FETCH uid %d: %w", uid, err)
 	}
 	if len(messages) == 0 {
-		return nil, fmt.Errorf("message uid %d in %s: %w", uid, folder, ErrNotFound)
+		return nil, Envelope{}, fmt.Errorf("message uid %d in %s: %w", uid, folder, ErrNotFound)
 	}
 
 	msg := messages[0]
@@ -208,17 +233,10 @@ func (c *IMAPClient) FetchMessage(ctx context.Context, folder string, uid uint32
 		break
 	}
 	if body == nil {
-		return nil, fmt.Errorf("no body returned for uid %d: %w", uid, ErrNotFound)
+		return nil, Envelope{}, fmt.Errorf("no body returned for uid %d: %w", uid, ErrNotFound)
 	}
 
-	parsed, err := ParseMessage(bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("parsing message uid %d: %w", uid, err)
-	}
-
-	env := imapEnvelopeToEnvelope(msg)
-	parsed.Envelope = env
-	return parsed, nil
+	return body, imapEnvelopeToEnvelope(msg), nil
 }
 
 func (c *IMAPClient) DeleteMessages(ctx context.Context, folder string, uids []uint32) error {

@@ -251,11 +251,14 @@ func (c *IMAPClient) MoveMessage(ctx context.Context, uid uint32, from, to strin
 func (c *IMAPClient) MoveMessages(ctx context.Context, uids []uint32, from, to string) error
 func (c *IMAPClient) AppendMessage(ctx context.Context, folder string, message []byte, flags []string) (uint32, error)
 func (c *IMAPClient) CheckUIDsExist(ctx context.Context, folder string, uids []uint32) ([]uint32, error)
+func (c *IMAPClient) FetchRaw(ctx context.Context, folder string, uid uint32, peek bool) ([]byte, error)
 func (c *IMAPClient) ListEnvelopePage(ctx context.Context, folder string, limit, offset int) (EnvelopePage, error)
 func (c *IMAPClient) SearchPage(ctx context.Context, folder string, criteria SearchCriteria) (EnvelopePage, error)
 ```
 
 `AppendMessage` returns the server-assigned UID (via UIDPLUS). `CheckUIDsExist` returns the subset of UIDs that exist in the folder.
+
+`FetchRaw` returns the message source unparsed, for archiving a `.eml`, forwarding whole, or inspecting a message that `FetchMessage` cannot make sense of.
 
 `ListEnvelopePage` and `SearchPage` return an `EnvelopePage`, which is the same envelopes plus a `Total`: how many the folder holds, or how many matched, before the limit was applied. `ListEnvelopes` and `Search` are those two with the total dropped, kept because most callers do not need it. The count is free either way, since SELECT and UID SEARCH report it regardless.
 

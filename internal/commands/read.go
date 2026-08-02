@@ -14,11 +14,13 @@ func Read(g *cmdutil.GlobalFlags, args []string) error {
 	fs := flag.NewFlagSet("read", flag.ContinueOnError)
 	folder := fs.String("folder", "INBOX", "folder")
 	peek := fs.Bool("peek", false, "don't mark message as read")
+	raw := fs.Bool("raw", false, "write the RFC 822 source instead of the parsed message")
 	withData := fs.Bool("with-attachment-data", false, "include attachment bytes in JSON output")
 	noAttachments := fs.Bool("no-attachments", false, "exclude attachment data (now the default)")
 	saveAttachments := fs.String("save-attachments", "", "save attachments to directory")
 	args = helpers.ReorderArgs(args, map[string]bool{
 		"peek":                 true,
+		"raw":                  true,
 		"no-attachments":       true,
 		"with-attachment-data": true,
 	})
@@ -36,6 +38,12 @@ func Read(g *cmdutil.GlobalFlags, args []string) error {
 	}
 	uid := uids[0]
 
+	// --raw never parses, so it can never find an attachment to write. Saying
+	// so beats accepting the flag and quietly leaving the directory empty.
+	if *raw && *saveAttachments != "" {
+		return fmt.Errorf("usage: --raw does not parse the message, so --save-attachments has nothing to save")
+	}
+
 	usePeek := *peek || g.Config.Defaults.PeekOnRead
 
 	client, _, err := helpers.ConnectIMAP(g.Ctx, g.Config, g.Account, g.Logger)
@@ -43,6 +51,10 @@ func Read(g *cmdutil.GlobalFlags, args []string) error {
 		return err
 	}
 	defer client.Close()
+
+	if *raw {
+		return readRaw(g, client, *folder, uid, usePeek)
+	}
 
 	msg, err := client.FetchMessage(g.Ctx, *folder, uid, usePeek)
 	if err != nil {
@@ -104,6 +116,39 @@ func Read(g *cmdutil.GlobalFlags, args []string) error {
 	fmt.Fprintln(g.Out())
 	fmt.Fprintln(g.Out(), msg.TextBody)
 	return nil
+}
+
+// rawResponse carries the message source in JSON mode. Raw is []byte so it
+// marshals to base64, the same as attachment bytes: RFC 822 source is not
+// required to be valid UTF-8, and a JSON string would silently replace
+// whatever is not.
+type rawResponse struct {
+	UID    uint32 `json:"uid"`
+	Folder string `json:"folder"`
+	Size   int    `json:"size"`
+	Raw    []byte `json:"raw"`
+}
+
+// readRaw writes the message exactly as the server holds it. In table mode
+// that means the bytes and nothing else, so `read --raw 42 > msg.eml` gives a
+// file other mail software will open.
+func readRaw(g *cmdutil.GlobalFlags, client *mail.IMAPClient, folder string, uid uint32, peek bool) error {
+	source, err := client.FetchRaw(g.Ctx, folder, uid, peek)
+	if err != nil {
+		return err
+	}
+
+	if g.JSON {
+		return output.PrintJSON(g.Out(), rawResponse{
+			UID:    uid,
+			Folder: folder,
+			Size:   len(source),
+			Raw:    source,
+		})
+	}
+
+	_, err = g.Out().Write(source)
+	return err
 }
 
 func formatAddresses(addrs []mail.Address) string {
