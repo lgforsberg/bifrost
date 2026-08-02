@@ -430,7 +430,7 @@ JSON output: `[{"address": "...", "displayName": "...", "default": true, "imapHo
 bifrost draft save [--to ADDR...] [--cc ADDR...] [--bcc ADDR...] [--subject TEXT]
                    [--from ADDR] [--approval] [--body TEXT | --body-file PATH] [--attach PATH...]
 bifrost draft list [--limit N] [--offset N]
-bifrost draft send [--force] <uid>
+bifrost draft send [--force] [--no-save] <uid>
 bifrost draft approve <uid>
 bifrost draft delete [--permanent] <uid>
 ```
@@ -450,7 +450,9 @@ bifrost --json draft send "$uid"                                     # now it go
 
 `draft approve` clears the keyword and nothing else. `draft send --force` sends without clearing it, for when the approval is not wanted rather than not given.
 
-`draft delete` moves the draft to Trash, matching `delete`; `--permanent` expunges it. A draft removed by `draft send` is expunged either way, since a copy of it is already in Sent.
+`draft send` honours the `saveToSent` default and `--no-save`, the same as `send`, `reply` and `forward`.
+
+`draft delete` moves the draft to Trash, matching `delete`; `--permanent` expunges it. A draft removed by `draft send` is expunged either way, since it has been delivered and the copy in Sent, if you kept one, is the record.
 
 #### `config` — Configuration management
 

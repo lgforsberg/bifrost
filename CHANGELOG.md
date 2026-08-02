@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-08-02
+
+### Fixed
+
+- `draft send` ignored the `saveToSent` default and filed a copy in Sent no
+  matter what, while `send`, `reply` and `forward` all honoured it. It now
+  honours the setting and takes `--no-save` like the others.
+
+### Added
+
+- `mail.SendDraftWithOptions` and `mail.SendDraftOptions` carry the choice.
+  `mail.SendDraft` keeps its signature and its behaviour of always filing a
+  copy, since it is published.
+
 ## [1.17.1] - 2026-08-02
 
 ### Fixed
@@ -411,7 +425,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.17.1...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.18.0...HEAD
+[1.18.0]: https://github.com/lgforsberg/bifrost/compare/v1.17.1...v1.18.0
 [1.17.1]: https://github.com/lgforsberg/bifrost/compare/v1.17.0...v1.17.1
 [1.17.0]: https://github.com/lgforsberg/bifrost/compare/v1.16.0...v1.17.0
 [1.16.0]: https://github.com/lgforsberg/bifrost/compare/v1.15.0...v1.16.0

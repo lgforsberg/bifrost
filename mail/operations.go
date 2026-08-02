@@ -221,7 +221,25 @@ func SaveDraft(ctx context.Context, imap *IMAPClient, opts SendOptions, keywords
 // SendDraft fetches a draft, delivers it, removes from Drafts, and saves to
 // Sent. Failures in the two cleanup steps are reported in the result rather
 // than returned, since the message has already gone out by then.
+// SendDraftOptions carries the choices SendDraft cannot infer. It exists so
+// this can grow without disturbing SendDraft's signature, which is published.
+type SendDraftOptions struct {
+	// SaveToSent files a copy in Sent after delivery, the same choice Send
+	// takes as an argument. SendDraft, which predates this, always does.
+	SaveToSent bool
+}
+
+// SendDraft delivers a draft and files a copy in Sent. Use
+// SendDraftWithOptions to decide that second part.
 func SendDraft(ctx context.Context, account AccountConfig, imap *IMAPClient, uid uint32, logger *slog.Logger) (SendResult, error) {
+	return SendDraftWithOptions(ctx, account, imap, uid, SendDraftOptions{SaveToSent: true}, logger)
+}
+
+// SendDraftWithOptions delivers the draft at uid, removes it from Drafts, and
+// files a copy in Sent if asked to. Steps after delivery are reported as
+// warnings rather than errors: the message has gone out either way, and
+// failing the call would invite a retry and a second copy.
+func SendDraftWithOptions(ctx context.Context, account AccountConfig, imap *IMAPClient, uid uint32, sendOpts SendDraftOptions, logger *slog.Logger) (SendResult, error) {
 	draftsFolder, err := imap.FindSpecialFolder(ctx, "\\Drafts")
 	if err != nil {
 		draftsFolder = "Drafts"
@@ -269,7 +287,9 @@ func SendDraft(ctx context.Context, account AccountConfig, imap *IMAPClient, uid
 			fmt.Sprintf("message was sent, but the draft is still in %s: %v", draftsFolder, err))
 	}
 
-	result.Warnings = append(result.Warnings, appendToSent(ctx, imap, opts, composed)...)
+	if sendOpts.SaveToSent {
+		result.Warnings = append(result.Warnings, appendToSent(ctx, imap, opts, composed)...)
+	}
 
 	return result, nil
 }

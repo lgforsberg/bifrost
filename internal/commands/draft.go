@@ -184,13 +184,14 @@ func draftList(g *cmdutil.GlobalFlags, args []string) error {
 func draftSend(g *cmdutil.GlobalFlags, args []string) error {
 	fs := flag.NewFlagSet("draft send", flag.ContinueOnError)
 	force := fs.Bool("force", false, "send even if the draft is still awaiting approval")
-	args = helpers.ReorderArgs(args, map[string]bool{"force": true})
+	noSave := fs.Bool("no-save", false, "don't save to Sent")
+	args = helpers.ReorderArgs(args, map[string]bool{"force": true, "no-save": true})
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("usage: %w", err)
 	}
 
 	if fs.NArg() < 1 {
-		return fmt.Errorf("usage: draft send [--force] <uid>")
+		return fmt.Errorf("usage: draft send [--force] [--no-save] <uid>")
 	}
 
 	uids, err := helpers.ParseUIDs(fs.Args()[:1])
@@ -223,7 +224,9 @@ func draftSend(g *cmdutil.GlobalFlags, args []string) error {
 		}
 	}
 
-	res, err := mail.SendDraft(g.Ctx, *acct, client, uids[0], g.Logger)
+	saveToSent := g.Config.Defaults.SaveToSent && !*noSave
+	res, err := mail.SendDraftWithOptions(g.Ctx, *acct, client, uids[0],
+		mail.SendDraftOptions{SaveToSent: saveToSent}, g.Logger)
 	if err != nil {
 		return err
 	}

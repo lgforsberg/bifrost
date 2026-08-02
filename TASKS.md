@@ -83,10 +83,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## LATER
 
-- **T-034** `draft send` ignores the `saveToSent` default and has no `--no-save`, so it always
-  files a Sent copy while `send`/`reply`/`forward` all honour the setting. Either thread the
-  config through `SendDraft` or document the difference deliberately.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/operations.go:SendDraft`
 - **T-033** Make the network timeouts configurable. T-004 hardcodes a 30s dial and a 60s idle
   deadline, which is right for interactive use but arbitrary: a large attachment over a slow
   link is fine (the deadline is per read, not total) but an agent may want to fail faster, and
@@ -141,6 +137,11 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-034** `draft send` honours `saveToSent` and `--no-save` like the other three send paths.
+  Threaded through a new `SendDraftWithOptions` rather than a parameter on `SendDraft`, per the
+  rule in CONTRIBUTING: `package mail` is published, so add rather than change a signature.
+  ↳ done 2026-08-02 · evidence: two library tests over the in-process SMTP and IMAP servers, one
+  declining the copy and one pinning that the old entry point still files it. v1.18.0
 - **T-039** Per-command help works without a config, and asking for it exits 0. Two faults, not
   one: the config load sat ahead of dispatch, and `flag.ErrHelp` fell through to the exit-2 usage
   path so the help text arrived with `error:` underneath it. A broken config is now reported only

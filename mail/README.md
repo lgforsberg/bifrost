@@ -342,9 +342,12 @@ Moves messages to the Archive folder, creating it if it doesn't exist.
 ```go
 func SaveDraft(ctx context.Context, imap *IMAPClient, opts SendOptions, keywords ...string) (uint32, error)
 func SendDraft(ctx context.Context, account AccountConfig, imap *IMAPClient, uid uint32, logger *slog.Logger) (SendResult, error)
+func SendDraftWithOptions(ctx context.Context, account AccountConfig, imap *IMAPClient, uid uint32, sendOpts SendDraftOptions, logger *slog.Logger) (SendResult, error)
 ```
 
 `SaveDraft` saves to Drafts with `\Draft` and `\Seen` flags, plus optional IMAP keywords (e.g. `KeywordPendingApproval`). Returns server-assigned UID.
+
+`SendDraft` always files a copy in Sent. `SendDraftWithOptions` takes a `SendDraftOptions` to decide that, which is the choice `Send` takes as an argument. Both remove the draft once it is delivered, since declining to archive a message is not declining to send it.
 
 `SendDraft` fetches a draft, delivers it, removes it from Drafts, and saves to Sent. The returned `SendResult` carries the message id and any warnings from the steps after delivery.
 

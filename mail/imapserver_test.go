@@ -359,6 +359,76 @@ func TestDraft_SaveThenSendLeavesNothingBehind(t *testing.T) {
 	}
 }
 
+// send, reply and forward all honour saveToSent; draft send used to file a
+// copy no matter what. The draft still has to leave Drafts either way, since
+// declining to archive is not declining to send.
+func TestSendDraftWithOptions_CanDeclineTheSentCopy(t *testing.T) {
+	smtpSrv := newTestSMTPServer(t, smtpFailures{})
+	client, user := newTestIMAPClient(t, AccountConfig{})
+	ctx := context.Background()
+
+	if err := user.Create("Sent", nil); err != nil {
+		t.Fatalf("creating Sent: %v", err)
+	}
+
+	uid, err := SaveDraft(ctx, client, testSendOptions("Unfiled"))
+	if err != nil {
+		t.Fatalf("SaveDraft: %v", err)
+	}
+
+	res, err := SendDraftWithOptions(ctx, smtpAccount(smtpSrv), client, uid,
+		SendDraftOptions{SaveToSent: false}, discardLogger())
+	if err != nil {
+		t.Fatalf("SendDraftWithOptions: %v", err)
+	}
+	if len(res.Warnings) != 0 {
+		t.Errorf("unexpected warnings: %v", res.Warnings)
+	}
+
+	envelopes, err := client.ListEnvelopes(ctx, "Sent", 10, 0)
+	if err != nil {
+		t.Fatalf("listing Sent: %v", err)
+	}
+	if len(envelopes) != 0 {
+		t.Errorf("Sent holds %+v, want nothing filed", envelopes)
+	}
+
+	remaining, err := client.CheckUIDsExist(ctx, "Drafts", []uint32{uid})
+	if err != nil {
+		t.Fatalf("CheckUIDsExist: %v", err)
+	}
+	if len(remaining) != 0 {
+		t.Errorf("the draft is still in Drafts: %v", remaining)
+	}
+}
+
+// The published signature has to keep behaving as it always did.
+func TestSendDraft_StillFilesTheCopyByDefault(t *testing.T) {
+	smtpSrv := newTestSMTPServer(t, smtpFailures{})
+	client, user := newTestIMAPClient(t, AccountConfig{})
+	ctx := context.Background()
+
+	if err := user.Create("Sent", nil); err != nil {
+		t.Fatalf("creating Sent: %v", err)
+	}
+
+	uid, err := SaveDraft(ctx, client, testSendOptions("Filed"))
+	if err != nil {
+		t.Fatalf("SaveDraft: %v", err)
+	}
+	if _, err := SendDraft(ctx, smtpAccount(smtpSrv), client, uid, discardLogger()); err != nil {
+		t.Fatalf("SendDraft: %v", err)
+	}
+
+	envelopes, err := client.ListEnvelopes(ctx, "Sent", 10, 0)
+	if err != nil {
+		t.Fatalf("listing Sent: %v", err)
+	}
+	if len(envelopes) != 1 || envelopes[0].Subject != "Filed" {
+		t.Errorf("Sent holds %+v, want the sent draft", envelopes)
+	}
+}
+
 // The attribute is what a real server sends and imapmemserver cannot, so
 // until now only the pure matcher covered this. Here it comes off the wire.
 func TestFindSpecialFolder_ReadsAttributesFromTheServer(t *testing.T) {
