@@ -507,6 +507,63 @@ func TestFlag_MissingUIDIsAUsageError(t *testing.T) {
 	}
 }
 
+// The point of STATUS is answering "how many unread?" without listing
+// anything, so the unseen count is the assertion that matters.
+func TestFolderStatus_CountsWithoutListing(t *testing.T) {
+	cli := newTestCLI(t)
+	uids := cli.seed(t, "INBOX", "One", "Two", "Three")
+
+	// seed marks everything \Seen, so make one unread to count.
+	if err := MarkUnread(cli.g, []string{fmt.Sprintf("%d", uids[0])}); err != nil {
+		t.Fatalf("mark-unread: %v", err)
+	}
+	cli.out.Reset()
+
+	if err := Folder(cli.g, []string{"status"}); err != nil {
+		t.Fatalf("folder status: %v", err)
+	}
+
+	obj := cli.decodeObject(t)
+	if obj["name"] != "INBOX" {
+		t.Errorf("name = %v, want INBOX", obj["name"])
+	}
+	if obj["total"] != float64(3) {
+		t.Errorf("total = %v, want 3", obj["total"])
+	}
+	if obj["unseen"] != float64(1) {
+		t.Errorf("unseen = %v, want 1", obj["unseen"])
+	}
+	if _, ok := obj["uidNext"]; !ok {
+		t.Error("uidNext missing, which is what a caller pages from")
+	}
+}
+
+func TestFolderStatus_NamedFolder(t *testing.T) {
+	cli := newTestCLI(t)
+	cli.seed(t, "Projects", "Only one here")
+
+	if err := Folder(cli.g, []string{"status", "Projects"}); err != nil {
+		t.Fatalf("folder status Projects: %v", err)
+	}
+
+	obj := cli.decodeObject(t)
+	if obj["name"] != "Projects" {
+		t.Errorf("name = %v, want Projects", obj["name"])
+	}
+	if obj["total"] != float64(1) {
+		t.Errorf("total = %v, want 1", obj["total"])
+	}
+}
+
+func TestFolderStatus_UnknownFolderIsNotFound(t *testing.T) {
+	cli := newTestCLI(t)
+
+	err := Folder(cli.g, []string{"status", "No Such Folder"})
+	if !errors.Is(err, mail.ErrNotFound) {
+		t.Fatalf("error = %v, want ErrNotFound", err)
+	}
+}
+
 func TestRead_JSON(t *testing.T) {
 	cli := newTestCLI(t)
 	uids := cli.seed(t, "INBOX", "Hello")

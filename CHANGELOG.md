@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-08-02
+
+### Added
+
+- `folder status [name]` reports a folder's message count, unseen count,
+  uidnext and uidvalidity via IMAP STATUS, which neither selects the mailbox
+  nor fetches envelopes. Defaults to `INBOX`. Counts the server declines to
+  give are omitted from JSON and shown as `unknown` in table output, rather
+  than reported as zero.
+- `mail.IMAPClient.FolderStatus` and `mail.FolderStatus`.
+
 ## [1.16.0] - 2026-08-02
 
 ### Added
@@ -388,7 +399,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.16.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.17.0...HEAD
+[1.17.0]: https://github.com/lgforsberg/bifrost/compare/v1.16.0...v1.17.0
 [1.16.0]: https://github.com/lgforsberg/bifrost/compare/v1.15.0...v1.16.0
 [1.15.0]: https://github.com/lgforsberg/bifrost/compare/v1.14.0...v1.15.0
 [1.14.0]: https://github.com/lgforsberg/bifrost/compare/v1.13.0...v1.14.0

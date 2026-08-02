@@ -188,7 +188,7 @@ Without `--json`, errors print to stderr as `error: <message>`.
 | `move` | Move messages to another folder |
 | `mark-read` / `mark-unread` | Change read state |
 | `flag` / `unflag` | Set or clear the `\Flagged` marker |
-| `folder` | Manage folders (list, create, rename, delete) |
+| `folder` | Manage folders (list, status, create, rename, delete) |
 | `accounts` | List configured accounts |
 | `draft` | Manage drafts (save, list, send, delete) |
 | `config` | Configuration management (init) |
@@ -392,12 +392,25 @@ Clearing a flag that was never set is not an error, which is what IMAP does.
 
 ```
 bifrost folder list
+bifrost folder status [name]
 bifrost folder create <name>
 bifrost folder rename <old> <new>
 bifrost folder delete <name>
 ```
 
-Semantic errors: `ALREADY_EXISTS` on duplicate create, `NOT_FOUND` on rename/delete of a missing folder.
+Semantic errors: `ALREADY_EXISTS` on duplicate create, `NOT_FOUND` on rename/delete/status of a missing folder.
+
+`folder status` answers "how many are in here, and how many are unread" without selecting the mailbox or fetching a single envelope. It defaults to `INBOX`:
+
+```bash
+bifrost --json folder status | jq .unseen
+```
+
+```json
+{"name": "INBOX", "total": 137, "unseen": 4, "uidNext": 1421, "uidValidity": 1}
+```
+
+`total` and `unseen` are omitted rather than reported as `0` if the server declines to give them, since not answering is not the same as answering none. Table output prints `unknown` in that case.
 
 #### `accounts` — List configured accounts
 

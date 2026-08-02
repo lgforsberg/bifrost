@@ -78,9 +78,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NOW
 
-- **T-018** `folder status` command exposing IMAP STATUS (total, unseen, uidnext) so an agent
-  can ask "how many unread?" without listing envelopes.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/folder.go`
 - **T-039** `bifrost inbox --help` fails with a config error instead of printing the flags: config
   is loaded during dispatch, before the subcommand parses anything, so no per-command help is
   reachable without a working account. Discovering what a command takes should not require
@@ -149,6 +146,11 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-018** `folder status [name]` over IMAP STATUS: counts a mailbox without selecting it or
+  fetching envelopes. `Total` and `Unseen` are `*uint32` because STATUS items are optional, and
+  a server that declines to answer must not read as a confident zero.
+  ↳ done 2026-08-02 · evidence: three command tests covering the unseen count, a named folder,
+  and NOT_FOUND on a folder that is not there. v1.17.0
 - **T-015** `flag`/`unflag` set and clear `\Flagged`. The marker was readable and not writable:
   `search --flagged` had nothing to find. One implementation behind both commands, since they
   differ only in direction.

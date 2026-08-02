@@ -172,6 +172,34 @@ func (c *IMAPClient) ListEnvelopePage(ctx context.Context, folder string, limit,
 	return page, nil
 }
 
+// FolderStatus asks the server how much a folder holds. STATUS does not
+// select the mailbox and returns no message data, so this is the cheap way to
+// ask "how many unread?" rather than listing envelopes and counting them.
+func (c *IMAPClient) FolderStatus(ctx context.Context, folder string) (FolderStatus, error) {
+	c.logger.Debug("reading folder status", "folder", folder)
+
+	data, err := c.client.Status(folder, &imap.StatusOptions{
+		NumMessages: true,
+		NumUnseen:   true,
+		UIDNext:     true,
+		UIDValidity: true,
+	}).Wait()
+	if err != nil {
+		if isNoSuchMailbox(err) {
+			return FolderStatus{}, fmt.Errorf("folder %q: %w", folder, ErrNotFound)
+		}
+		return FolderStatus{}, fmt.Errorf("STATUS %s: %w", folder, err)
+	}
+
+	return FolderStatus{
+		Name:        folder,
+		Total:       data.NumMessages,
+		Unseen:      data.NumUnseen,
+		UIDNext:     uint32(data.UIDNext),
+		UIDValidity: data.UIDValidity,
+	}, nil
+}
+
 func (c *IMAPClient) FetchMessage(ctx context.Context, folder string, uid uint32, peek bool) (*Message, error) {
 	source, env, err := c.fetchSource(ctx, folder, uid, peek)
 	if err != nil {

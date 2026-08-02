@@ -10,7 +10,7 @@ import (
 
 func Folder(g *cmdutil.GlobalFlags, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: folder <list|create|rename|delete>")
+		return fmt.Errorf("usage: folder <list|status|create|rename|delete>")
 	}
 
 	sub := args[0]
@@ -19,6 +19,12 @@ func Folder(g *cmdutil.GlobalFlags, args []string) error {
 	switch sub {
 	case "list":
 		return folderList(g)
+	case "status":
+		name := "INBOX"
+		if len(subArgs) > 0 {
+			name = subArgs[0]
+		}
+		return folderStatus(g, name)
 	case "create":
 		if len(subArgs) < 1 {
 			return fmt.Errorf("usage: folder create <name>")
@@ -35,10 +41,43 @@ func Folder(g *cmdutil.GlobalFlags, args []string) error {
 		}
 		return folderDelete(g, subArgs[0])
 	case "help", "--help", "-h":
-		return fmt.Errorf("usage: folder <list|create|rename|delete>")
+		return fmt.Errorf("usage: folder <list|status|create|rename|delete>")
 	default:
-		return fmt.Errorf("usage: unknown subcommand %q (list, create, rename, delete)", sub)
+		return fmt.Errorf("usage: unknown subcommand %q (list, status, create, rename, delete)", sub)
 	}
+}
+
+func folderStatus(g *cmdutil.GlobalFlags, name string) error {
+	client, _, err := helpers.ConnectIMAP(g.Ctx, g.Config, g.Account, g.Logger)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	status, err := client.FolderStatus(g.Ctx, name)
+	if err != nil {
+		return err
+	}
+
+	if g.JSON {
+		return output.PrintJSON(g.Out(), status)
+	}
+
+	fmt.Fprintf(g.Out(), "Folder:       %s\n", status.Name)
+	fmt.Fprintf(g.Out(), "Messages:     %s\n", countOrUnknown(status.Total))
+	fmt.Fprintf(g.Out(), "Unseen:       %s\n", countOrUnknown(status.Unseen))
+	fmt.Fprintf(g.Out(), "UID next:     %d\n", status.UIDNext)
+	fmt.Fprintf(g.Out(), "UID validity: %d\n", status.UIDValidity)
+	return nil
+}
+
+// countOrUnknown keeps a count the server declined to give from reading as a
+// confident zero.
+func countOrUnknown(n *uint32) string {
+	if n == nil {
+		return "unknown"
+	}
+	return fmt.Sprintf("%d", *n)
 }
 
 func folderList(g *cmdutil.GlobalFlags) error {

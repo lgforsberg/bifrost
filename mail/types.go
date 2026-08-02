@@ -73,6 +73,21 @@ type Envelope struct {
 	Size    uint32    `json:"size"`
 }
 
+// FolderStatus is what IMAP STATUS reports about a mailbox: how much is in it,
+// without selecting it or fetching a single envelope.
+//
+// The counts are pointers because STATUS items are optional and a server need
+// not return one that was asked for. Nil means the server did not say, which
+// is not the same as none, and flattening the two would turn silence into a
+// confident zero.
+type FolderStatus struct {
+	Name        string  `json:"name"`
+	Total       *uint32 `json:"total,omitempty"`
+	Unseen      *uint32 `json:"unseen,omitempty"`
+	UIDNext     uint32  `json:"uidNext,omitempty"`
+	UIDValidity uint32  `json:"uidValidity,omitempty"`
+}
+
 // EnvelopePage is a window onto a larger set: the envelopes that were asked
 // for, and how many there were before the limit was applied. Total is the
 // point of it, since a bare page cannot tell a caller whether it is looking at

@@ -202,9 +202,12 @@ func (c *IMAPClient) Close() error
 ```go
 func (c *IMAPClient) ListFolders(ctx context.Context) ([]Folder, error)
 func (c *IMAPClient) ListEnvelopes(ctx context.Context, folder string, limit, offset int) ([]Envelope, error)
+func (c *IMAPClient) FolderStatus(ctx context.Context, folder string) (FolderStatus, error)
 ```
 
 `ListEnvelopes` returns newest-first, supporting pagination via `offset`.
+
+`FolderStatus` issues IMAP STATUS, which counts a mailbox without selecting it or fetching anything. Its `Total` and `Unseen` are `*uint32`: STATUS items are optional, and nil records that the server did not answer rather than that the answer was zero.
 
 ### Fetching
 

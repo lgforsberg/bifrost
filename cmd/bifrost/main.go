@@ -16,7 +16,7 @@ import (
 	"github.com/lgforsberg/bifrost/mail"
 )
 
-const version = "1.16.0"
+const version = "1.17.0"
 
 func main() {
 	globals, args := parseGlobalFlags(os.Args[1:])
@@ -215,7 +215,7 @@ Commands:
   mark-unread  Mark messages as unread
   flag         Flag messages (\Flagged)
   unflag       Clear the flag on messages
-  folder       Manage folders (list, create, rename, delete)
+  folder       Manage folders (list, status, create, rename, delete)
   accounts     List configured accounts
   draft        Manage drafts (save, list, send, approve, delete)
   config       Configuration management (init)
