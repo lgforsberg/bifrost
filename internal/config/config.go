@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/lgforsberg/bifrost/mail"
 )
@@ -18,6 +19,10 @@ type Defaults struct {
 	DraftsFolder  string `json:"draftsFolder"`
 	TrashFolder   string `json:"trashFolder"`
 	ArchiveFolder string `json:"archiveFolder"`
+
+	// Timeout is a Go duration such as "10s". Empty leaves the built-in
+	// network timeouts alone.
+	Timeout string `json:"timeout"`
 }
 
 type accountJSON struct {
@@ -36,6 +41,10 @@ type accountJSON struct {
 	DraftsFolder  string `json:"draftsFolder"`
 	TrashFolder   string `json:"trashFolder"`
 	ArchiveFolder string `json:"archiveFolder"`
+
+	// Timeout overrides the default for this account, for the one server on
+	// a slow link among several that are not.
+	Timeout string `json:"timeout"`
 }
 
 type serverJSON struct {
@@ -99,6 +108,11 @@ func Load(path string) (*Config, error) {
 			return nil, fmt.Errorf("account %d (%s): smtp.host is required: %w", i, acct.Address, mail.ErrInvalidConfig)
 		}
 
+		timeout, err := parseTimeout(withDefaultStr(acct.Timeout, raw.Defaults.Timeout))
+		if err != nil {
+			return nil, fmt.Errorf("account %d (%s): %w", i, acct.Address, err)
+		}
+
 		cfg.Accounts = append(cfg.Accounts, mail.AccountConfig{
 			Address:        acct.Address,
 			DisplayName:    acct.DisplayName,
@@ -114,6 +128,7 @@ func Load(path string) (*Config, error) {
 			DraftsFolder:   withDefaultStr(acct.DraftsFolder, raw.Defaults.DraftsFolder),
 			TrashFolder:    withDefaultStr(acct.TrashFolder, raw.Defaults.TrashFolder),
 			ArchiveFolder:  withDefaultStr(acct.ArchiveFolder, raw.Defaults.ArchiveFolder),
+			Timeout:        timeout,
 		})
 		if acct.Default && cfg.defaultAccount == -1 {
 			cfg.defaultAccount = len(cfg.Accounts) - 1
@@ -226,6 +241,25 @@ func withDefaultStr(val, def string) string {
 	return val
 }
 
+// parseTimeout reads a Go duration such as "10s". Empty means the built-in
+// defaults, which is not the same as zero: a zero timeout would mean no
+// deadline at all, and a config that asks for one is likelier to be a mistake
+// than a request to wait forever.
+func parseTimeout(s string) (time.Duration, error) {
+	if s == "" {
+		return 0, nil
+	}
+
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, fmt.Errorf("timeout %q is not a duration such as \"30s\": %w", s, mail.ErrInvalidConfig)
+	}
+	if d <= 0 {
+		return 0, fmt.Errorf("timeout %q must be positive: %w", s, mail.ErrInvalidConfig)
+	}
+	return d, nil
+}
+
 // parseDefaultsKeys returns which keys are present in the "defaults" JSON object.
 func parseDefaultsKeys(data []byte) map[string]bool {
 	var outer struct {
@@ -257,7 +291,8 @@ func TemplateJSON() string {
     "sentFolder": "",
     "draftsFolder": "",
     "trashFolder": "",
-    "archiveFolder": ""
+    "archiveFolder": "",
+    "timeout": ""
   },
   "accounts": [
     {

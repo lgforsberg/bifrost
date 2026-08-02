@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/lgforsberg/bifrost/internal/config"
 )
@@ -15,9 +16,14 @@ type GlobalFlags struct {
 	JSON       bool
 	Verbose    bool
 	ConfigPath string
-	Ctx        context.Context
-	Logger     *slog.Logger
-	Config     *config.Config
+
+	// Timeout overrides the configured network timeout for this invocation.
+	// Zero means whatever the config said, which may itself be zero for the
+	// built-in defaults.
+	Timeout time.Duration
+	Ctx     context.Context
+	Logger  *slog.Logger
+	Config  *config.Config
 
 	// Where output goes. Both are nil outside tests, which is why commands
 	// reach for them through Out and Err rather than directly.

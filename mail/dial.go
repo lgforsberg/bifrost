@@ -10,20 +10,32 @@ import (
 )
 
 const (
-	// dialTimeout bounds establishing the connection, including the TLS
+	// defaultDialTimeout bounds establishing the connection, including the TLS
 	// handshake for implicit TLS.
-	dialTimeout = 30 * time.Second
+	defaultDialTimeout = 30 * time.Second
 
-	// ioTimeout bounds a single read or write once connected. It is an idle
-	// timeout rather than a total one: a large message keeps resetting it as
-	// long as bytes keep moving, but a server that goes quiet trips it.
-	ioTimeout = 60 * time.Second
+	// defaultIOTimeout bounds a single read or write once connected. It is an
+	// idle timeout rather than a total one: a large message keeps resetting it
+	// as long as bytes keep moving, but a server that goes quiet trips it.
+	//
+	// Longer than the dial because it covers a server thinking, where the dial
+	// covers only a socket opening. A configured timeout replaces both, on the
+	// reading that someone naming one number means no single wait should
+	// exceed it.
+	defaultIOTimeout = 60 * time.Second
 )
 
 // dial opens a connection to host:port for the given encryption mode. Implicit
 // TLS is negotiated here; for "starttls" the caller upgrades the returned
 // connection itself, using tlsConfigFor to name the certificate.
-func dial(ctx context.Context, host string, port int, encryption string) (net.Conn, error) {
+//
+// A zero timeout means the defaults above.
+func dial(ctx context.Context, host string, port int, encryption string, timeout time.Duration) (net.Conn, error) {
+	dialTimeout, ioTimeout := defaultDialTimeout, defaultIOTimeout
+	if timeout > 0 {
+		dialTimeout, ioTimeout = timeout, timeout
+	}
+
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	dialer := &net.Dialer{Timeout: dialTimeout}
 

@@ -110,7 +110,7 @@ func TestCloseOnCancel_ReleaseLeavesConnectionOpen(t *testing.T) {
 }
 
 func TestDial_RejectsUnknownEncryption(t *testing.T) {
-	_, err := dial(context.Background(), "localhost", 143, "sslv2")
+	_, err := dial(context.Background(), "localhost", 143, "sslv2", 0)
 	if !errors.Is(err, ErrInvalidConfig) {
 		t.Fatalf("dial error = %v, want ErrInvalidConfig", err)
 	}
@@ -171,5 +171,73 @@ func TestIMAPConnect_CancellationInterruptsSilentServer(t *testing.T) {
 	case conn := <-accepted:
 		conn.Close()
 	default:
+	}
+}
+
+// A configured timeout has to reach the socket, not just be stored. This
+// points at a listener that accepts and then says nothing, which without a
+// deadline would block until the process ended.
+func TestDial_ConfiguredTimeoutBoundsTheRead(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer ln.Close()
+
+	// Accepted and then ignored, deliberately: the point is a server that
+	// never answers.
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		<-time.After(time.Minute)
+		conn.Close()
+	}()
+
+	addr := ln.Addr().(*net.TCPAddr)
+	conn, err := dial(context.Background(), "127.0.0.1", addr.Port, "none", 100*time.Millisecond)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close()
+
+	started := time.Now()
+	if _, err := conn.Read(make([]byte, 1)); err == nil {
+		t.Fatal("the read succeeded against a server that never wrote anything")
+	}
+	if waited := time.Since(started); waited > 5*time.Second {
+		t.Errorf("the read waited %v, so the configured timeout was not applied", waited)
+	}
+}
+
+// Zero is not "no deadline": it means the built-in defaults, which are not the
+// same for the dial and for a read.
+func TestDial_ZeroTimeoutLeavesTheDefaults(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer ln.Close()
+	go func() {
+		if conn, err := ln.Accept(); err == nil {
+			defer conn.Close()
+			<-time.After(time.Second)
+		}
+	}()
+
+	addr := ln.Addr().(*net.TCPAddr)
+	conn, err := dial(context.Background(), "127.0.0.1", addr.Port, "none", 0)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close()
+
+	dc, ok := conn.(*deadlineConn)
+	if !ok {
+		t.Fatalf("dial returned %T, want a deadlineConn", conn)
+	}
+	if dc.timeout != defaultIOTimeout {
+		t.Errorf("io timeout = %v, want the default %v", dc.timeout, defaultIOTimeout)
 	}
 }

@@ -36,7 +36,7 @@ func (c *IMAPClient) Connect(ctx context.Context) error {
 	addr := net.JoinHostPort(host, strconv.Itoa(c.config.IMAPPort))
 	c.logger.Debug("connecting to IMAP", "addr", addr, "encryption", c.config.IMAPEncryption)
 
-	conn, err := dial(ctx, host, c.config.IMAPPort, c.config.IMAPEncryption)
+	conn, err := dial(ctx, host, c.config.IMAPPort, c.config.IMAPEncryption, c.config.Timeout)
 	if err != nil {
 		return err
 	}

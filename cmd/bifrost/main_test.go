@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
 	"github.com/lgforsberg/bifrost/mail"
@@ -331,6 +332,45 @@ func TestDescribeBuild(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if got := tt.build.String(); got != tt.want {
 				t.Errorf("String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseGlobalFlags_Timeout(t *testing.T) {
+	tests := map[string]struct {
+		args    []string
+		want    time.Duration
+		wantErr bool
+	}{
+		"a duration":                  {args: []string{"--timeout", "5s", "inbox"}, want: 5 * time.Second},
+		"attached":                    {args: []string{"--timeout=1m30s", "inbox"}, want: 90 * time.Second},
+		"absent leaves it to config":  {args: []string{"inbox"}, want: 0},
+		"not a duration":              {args: []string{"--timeout", "soon", "inbox"}, wantErr: true},
+		"a bare number is not either": {args: []string{"--timeout", "30", "inbox"}, wantErr: true},
+		"zero would mean no deadline": {args: []string{"--timeout", "0", "inbox"}, wantErr: true},
+		"negative":                    {args: []string{"--timeout", "-5s", "inbox"}, wantErr: true},
+		"missing value":               {args: []string{"--timeout"}, wantErr: true},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			g, _, err := parseGlobalFlags(tt.args)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("parseGlobalFlags(%q) succeeded, want an error", tt.args)
+				}
+				if _, exit, _ := classifyError(&cmdutil.GlobalFlags{}, err); exit != 2 {
+					t.Errorf("error %q exits %d, want 2", err, exit)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseGlobalFlags(%q): %v", tt.args, err)
+			}
+			if g.Timeout != tt.want {
+				t.Errorf("timeout = %v, want %v", g.Timeout, tt.want)
 			}
 		})
 	}

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/lgforsberg/bifrost/mail"
 )
@@ -462,5 +463,69 @@ func TestIsDefaultAccount(t *testing.T) {
 	}
 	if IsDefaultAccount(cfg, 1) {
 		t.Error("index 1 should not be default")
+	}
+}
+
+func TestLoad_Timeout(t *testing.T) {
+	tests := map[string]struct {
+		json    string
+		want    time.Duration
+		wantErr bool
+	}{
+		"absent leaves the built-in defaults": {
+			json: `{"accounts":[{"address":"a@example.com","password":"p","imap":{"host":"i"},"smtp":{"host":"s"}}]}`,
+			want: 0,
+		},
+		"from defaults": {
+			json: `{"defaults":{"timeout":"10s"},
+				"accounts":[{"address":"a@example.com","password":"p","imap":{"host":"i"},"smtp":{"host":"s"}}]}`,
+			want: 10 * time.Second,
+		},
+		"an account overrides the default": {
+			json: `{"defaults":{"timeout":"10s"},
+				"accounts":[{"address":"a@example.com","password":"p","timeout":"2m","imap":{"host":"i"},"smtp":{"host":"s"}}]}`,
+			want: 2 * time.Minute,
+		},
+		"not a duration": {
+			json: `{"defaults":{"timeout":"soon"},
+				"accounts":[{"address":"a@example.com","password":"p","imap":{"host":"i"},"smtp":{"host":"s"}}]}`,
+			wantErr: true,
+		},
+		"zero would mean no deadline at all": {
+			json: `{"defaults":{"timeout":"0s"},
+				"accounts":[{"address":"a@example.com","password":"p","imap":{"host":"i"},"smtp":{"host":"s"}}]}`,
+			wantErr: true,
+		},
+		"negative": {
+			json: `{"defaults":{"timeout":"-5s"},
+				"accounts":[{"address":"a@example.com","password":"p","imap":{"host":"i"},"smtp":{"host":"s"}}]}`,
+			wantErr: true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			if err := os.WriteFile(path, []byte(tt.json), 0600); err != nil {
+				t.Fatalf("writing config: %v", err)
+			}
+
+			cfg, err := Load(path)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("the config was accepted, want an error")
+				}
+				if !errors.Is(err, mail.ErrInvalidConfig) {
+					t.Errorf("error = %v, want ErrInvalidConfig", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if got := cfg.Accounts[0].Timeout; got != tt.want {
+				t.Errorf("timeout = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

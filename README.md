@@ -64,7 +64,8 @@ Run `bifrost config init` to generate a template.
     "sentFolder": "",
     "draftsFolder": "",
     "trashFolder": "",
-    "archiveFolder": ""
+    "archiveFolder": "",
+    "timeout": ""
   },
   "accounts": [
     {
@@ -95,6 +96,7 @@ Run `bifrost config init` to generate a template.
 | `draftsFolder` | `""` | Override Drafts folder name (auto-detected via IMAP if empty) |
 | `trashFolder` | `""` | Override Trash folder name (auto-detected via IMAP if empty) |
 | `archiveFolder` | `""` | Override Archive folder name (auto-detected via IMAP if empty) |
+| `timeout` | `""` | Bound on any single network wait, as a duration such as `"10s"` |
 
 Leave the folder overrides empty unless you need them. Bifrost otherwise asks the server which folder is which, via the IMAP special-use attributes, which is correct on localized and renamed accounts too.
 
@@ -119,10 +121,21 @@ An override wins over the server's answer. Commands that file mail somewhere (`a
 | `draftsFolder` | No | Override this account's Drafts folder |
 | `trashFolder` | No | Override this account's Trash folder |
 | `archiveFolder` | No | Override this account's Archive folder |
+| `timeout` | No | Override this account's network timeout |
 
 \* One of `password` or `passwordFile` is required. A `passwordFile` keeps the secret out of the config.
 
-The four folder overrides can be set per account as well as in `defaults`. An account's own value wins, and anything it leaves out falls back to the default, which matters when two accounts are on providers that name their folders differently.
+The four folder overrides can be set per account as well as in `defaults`. An account's own value wins, and anything it leaves out falls back to the default, which matters when two accounts are on providers that name their folders differently. `timeout` works the same way.
+
+**Network timeouts.** Left empty, Bifrost allows 30 seconds to open a connection and 60 seconds of silence on any single read or write. The second is an idle timeout, not a total one, so a large attachment is fine as long as bytes keep moving.
+
+Set `timeout` and that one number replaces both, on the reading that naming a single figure means no individual wait should exceed it. `--timeout` does the same for one invocation and beats the config:
+
+```bash
+bifrost --timeout 5s --json inbox
+```
+
+Shorter suits an agent that would rather fail and retry than wait; longer suits a slow link or a server that takes its time on a large mailbox. A timeout of zero is rejected rather than taken to mean "wait forever", since it is much likelier to be a mistake.
 
 ## CLI reference
 
@@ -140,6 +153,7 @@ bifrost [global options] <command> [command options] [arguments]
 | `--json` | All output as JSON to stdout (camelCase fields) |
 | `--verbose` | Debug logging to stderr |
 | `--config PATH` | Config file path (default: `~/.bifrost/config.json`, env: `BIFROST_CONFIG`) |
+| `--timeout DURATION` | Bound on any single network wait, e.g. `10s`; overrides the config |
 
 `--flag value` and `--flag=value` are both accepted, with one dash or two. A flag that takes a value and is given none, or given an empty one, is a usage error rather than a silent fallback to the default: `--account "$ACCT"` with the variable unset stops rather than sending from whichever account happens to be first.
 

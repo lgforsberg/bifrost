@@ -12,6 +12,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/lgforsberg/bifrost/internal/cmdutil"
 	"github.com/lgforsberg/bifrost/internal/commands"
@@ -23,7 +24,7 @@ import (
 // version is what this binary claims to be when the build carries no module
 // version of its own, which is the case for every build made from a source
 // tree rather than resolved from a tag.
-const version = "1.22.0"
+const version = "1.23.0"
 
 // buildInfo is what the running binary actually is. Revision and Modified come
 // from the VCS stamps the toolchain embeds and are absent from a build made
@@ -152,6 +153,15 @@ func main() {
 		}
 		cfg = &config.Config{}
 	}
+
+	// Applied to every account here, once, so that nothing downstream of this
+	// point has to know the flag exists. A timeout named on the command line
+	// beats whatever the config said, for this invocation only.
+	if globals.Timeout > 0 {
+		for i := range cfg.Accounts {
+			cfg.Accounts[i].Timeout = globals.Timeout
+		}
+	}
 	globals.Config = cfg
 
 	switch cmd {
@@ -261,6 +271,18 @@ func parseGlobalFlags(args []string) (cmdutil.GlobalFlags, []string, error) {
 				return g, nil, err
 			}
 			g.ConfigPath = value
+		case "timeout":
+			if err := takeValue(); err != nil {
+				return g, nil, err
+			}
+			d, err := time.ParseDuration(value)
+			if err != nil {
+				return g, nil, fmt.Errorf("usage: --timeout %q is not a duration such as 30s", value)
+			}
+			if d <= 0 {
+				return g, nil, fmt.Errorf("usage: --timeout must be positive, not %q", value)
+			}
+			g.Timeout = d
 		case "help", "h":
 			// Dispatched as a command of its own, so it passes through.
 			return g, args[i:], nil
@@ -405,5 +427,6 @@ Global options:
   --json            Output as JSON
   --verbose         Verbose logging to stderr
   --config PATH     Config file path (default: ~/.bifrost/config.json)
+  --timeout DUR     Bound on any single network wait, e.g. 10s
 `)
 }

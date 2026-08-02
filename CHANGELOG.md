@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-08-02
+
+### Added
+
+- The network timeouts are configurable: `timeout` in `defaults` or on an
+  account, and `--timeout` for one invocation. A duration such as `"10s"`
+  replaces both the 30s dial and the 60s idle deadline, on the reading that
+  naming one number means no single wait should exceed it. Left unset, the
+  existing defaults are unchanged.
+
+  Shorter suits an agent that would rather fail and retry than wait; longer
+  suits a slow link. Zero is rejected rather than read as "wait forever".
+- `mail.AccountConfig.Timeout`.
+
 ## [1.22.0] - 2026-08-02
 
 ### Added
@@ -512,7 +526,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.22.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.23.0...HEAD
+[1.23.0]: https://github.com/lgforsberg/bifrost/compare/v1.22.0...v1.23.0
 [1.22.0]: https://github.com/lgforsberg/bifrost/compare/v1.21.0...v1.22.0
 [1.21.0]: https://github.com/lgforsberg/bifrost/compare/v1.20.0...v1.21.0
 [1.20.0]: https://github.com/lgforsberg/bifrost/compare/v1.19.0...v1.20.0

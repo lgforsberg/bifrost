@@ -30,6 +30,11 @@ type AccountConfig struct {
 	Username       string // defaults to Address if empty
 	Password       string
 
+	// Timeout bounds any single wait on the network: establishing the
+	// connection, and each read or write once it is up. Zero leaves the
+	// built-in defaults, which are deliberately not the same for the two.
+	Timeout time.Duration
+
 	// Special folder overrides. Empty means "ask the server", which is the
 	// right answer almost always; these exist for accounts where the server
 	// advertises nothing and the conventional names do not fit either.

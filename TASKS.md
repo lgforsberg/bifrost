@@ -83,12 +83,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## LATER
 
-- **T-033** Make the network timeouts configurable. T-004 hardcodes a 30s dial and a 60s idle
-  deadline, which is right for interactive use but arbitrary: a large attachment over a slow
-  link is fine (the deadline is per read, not total) but an agent may want to fail faster, and
-  T-029's IDLE support would need the read deadline lifted entirely. A `--timeout` global flag
-  or a config default, threaded into `dial`.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/dial.go:dialTimeout`
 - **T-041** Recover a part inside a multipart whose transfer encoding has no decoder. T-032 fixed
   this for a whole message by going through `message.Read`, but `mail.Reader.NextPart` returns a
   nil part for the same case nested in a multipart, so those bytes are still lost (skipped with a
@@ -122,6 +116,13 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-033** Network timeouts configurable via `timeout` in the config (defaults or per account)
+  and `--timeout` for one invocation. One number replaces both the dial and the idle deadline;
+  unset keeps the existing 30s and 60s. T-029 will still need the read deadline lifted rather
+  than shortened, which this does not address.
+  ↳ done 2026-08-02 · evidence: a dial test against a listener that accepts and never answers,
+  proving the configured deadline reaches the socket; six config parse cases; eight flag cases.
+  v1.23.0
 - **T-023** `draft update <uid>` replaces a draft with a revised one. Wholesale replacement, not a
   merge, matching what the task described and what a revising agent already has to hand. Keeps
   `$PendingApproval` so a revision cannot leave the approval queue.

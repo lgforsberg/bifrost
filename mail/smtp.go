@@ -29,7 +29,7 @@ func SmtpDeliver(ctx context.Context, config AccountConfig, from string, compose
 		"size", len(composedMsg),
 	)
 
-	conn, err := dial(ctx, host, config.SMTPPort, config.SMTPEncryption)
+	conn, err := dial(ctx, host, config.SMTPPort, config.SMTPEncryption, config.Timeout)
 	if err != nil {
 		return err
 	}

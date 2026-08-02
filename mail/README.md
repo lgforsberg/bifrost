@@ -48,6 +48,7 @@ type AccountConfig struct {
     SMTPEncryption string // "starttls", "tls", "none"
     Username       string // defaults to Address if empty
     Password       string
+    Timeout        time.Duration // 0 leaves the built-in network timeouts
 }
 
 func (a *AccountConfig) EffectiveUsername() string
