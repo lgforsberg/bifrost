@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.25.1] - 2026-08-02
+
+### Fixed
+
+- `config init` ignored `BIFROST_CONFIG`, so with that variable set it wrote
+  the template to the default path while every other command read the one the
+  variable named, and the account setup appeared not to have been created at
+  all. It now resolves the path the same way as everything else: `--config`,
+  then `BIFROST_CONFIG`, then the default.
+
 ## [1.25.0] - 2026-08-02
 
 ### Added
@@ -583,7 +593,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.25.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.25.1...HEAD
+[1.25.1]: https://github.com/lgforsberg/bifrost/compare/v1.25.0...v1.25.1
 [1.25.0]: https://github.com/lgforsberg/bifrost/compare/v1.24.1...v1.25.0
 [1.24.1]: https://github.com/lgforsberg/bifrost/compare/v1.24.0...v1.24.1
 [1.24.0]: https://github.com/lgforsberg/bifrost/compare/v1.23.0...v1.24.0

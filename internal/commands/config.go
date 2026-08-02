@@ -39,13 +39,15 @@ func configInit(g *cmdutil.GlobalFlags, args []string) error {
 		return fmt.Errorf("usage: config init takes no arguments, got %q", fs.Arg(0))
 	}
 
-	cfgPath := config.DefaultConfigPath()
-	if g.ConfigPath != "" {
-		cfgPath = g.ConfigPath
-	}
+	// Resolved the same way every other command resolves it, so `config init`
+	// cannot write the template somewhere the next command will not look for
+	// it. The flag after the command wins over the one before it, and both
+	// win over BIFROST_CONFIG.
+	override := g.ConfigPath
 	if *pathFlag != "" {
-		cfgPath = *pathFlag
+		override = *pathFlag
 	}
+	cfgPath := config.ResolvePath(override)
 
 	if _, err := os.Stat(cfgPath); err == nil {
 		return fmt.Errorf("config file already exists at %s", cfgPath)

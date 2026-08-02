@@ -42,6 +42,40 @@ func TestConfigInit_UsesTheGlobalFlag(t *testing.T) {
 	}
 }
 
+// The environment variable was ignored here while every other command
+// honoured it, so `config init` wrote the template to the default path and
+// the next command went looking somewhere else and found nothing.
+func TestConfigInit_UsesTheEnvironmentVariable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "from-env.json")
+	t.Setenv("BIFROST_CONFIG", path)
+
+	if err := Config(&cmdutil.GlobalFlags{}, []string{"init"}); err != nil {
+		t.Fatalf("config init: %v", err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("nothing written to the path BIFROST_CONFIG names: %v", err)
+	}
+}
+
+// A flag is a deliberate instruction for one invocation; the environment is
+// standing configuration, so the flag wins.
+func TestConfigInit_FlagBeatsTheEnvironmentVariable(t *testing.T) {
+	dir := t.TempDir()
+	fromEnv := filepath.Join(dir, "from-env.json")
+	fromFlag := filepath.Join(dir, "from-flag.json")
+	t.Setenv("BIFROST_CONFIG", fromEnv)
+
+	if err := Config(&cmdutil.GlobalFlags{ConfigPath: fromFlag}, []string{"init"}); err != nil {
+		t.Fatalf("config init: %v", err)
+	}
+	if _, err := os.Stat(fromFlag); err != nil {
+		t.Errorf("nothing written to the path the flag names: %v", err)
+	}
+	if _, err := os.Stat(fromEnv); err == nil {
+		t.Error("the environment variable overrode the flag")
+	}
+}
+
 // Writing over a working config would cost someone their account setup.
 func TestConfigInit_RefusesToOverwrite(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")

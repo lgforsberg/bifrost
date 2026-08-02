@@ -72,7 +72,7 @@ type Config struct {
 }
 
 func Load(path string) (*Config, error) {
-	cfgPath := resolvePath(path)
+	cfgPath := ResolvePath(path)
 
 	data, err := os.ReadFile(cfgPath)
 	if err != nil {
@@ -219,7 +219,11 @@ func IsDefaultAccount(cfg *Config, idx int) bool {
 	return idx == 0
 }
 
-func resolvePath(override string) string {
+// ResolvePath returns the config file to use: an explicit override first,
+// then BIFROST_CONFIG, then the default location. Everything that touches the
+// config file goes through here, so reading and writing it cannot disagree
+// about where it lives.
+func ResolvePath(override string) string {
 	if override != "" {
 		return expandTilde(override)
 	}
@@ -299,12 +303,6 @@ func parseDefaultsKeys(data []byte) map[string]bool {
 		present[k] = true
 	}
 	return present
-}
-
-// DefaultConfigPath returns the standard config file location.
-func DefaultConfigPath() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".bifrost", "config.json")
 }
 
 // TemplateJSON returns a config template for `config init`.

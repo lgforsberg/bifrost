@@ -571,7 +571,9 @@ bifrost --json draft send "$uid"                                     # now it go
 bifrost config init [--config PATH]
 ```
 
-Creates a template config. Fails if one already exists.
+Creates a template config. Fails if one already exists, rather than writing over an account setup.
+
+It writes where the rest of Bifrost reads: `--config` if given, otherwise `BIFROST_CONFIG`, otherwise `~/.bifrost/config.json`.
 
 ### Body input
 

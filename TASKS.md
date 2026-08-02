@@ -83,11 +83,7 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## LATER
 
-- **T-042** `config init` honours `--config` but ignores `BIFROST_CONFIG`, while every other
-  command respects both: it writes the template to the default path and the next command reads
-  the other one. Found while testing T-027. Fix is to route it through the same path resolution
-  as `Load`.
-  ↳ since 2026-08-02 · pushed 0 · size S · verified 2026-08-02 · ref `internal/commands/config.go:42`
+_Empty. NOW, NEXT and LATER are all clear; what remains is GATED and PARKED._
 ## GATED
 
 - **T-028** 👤 Move off `go-imap v2.0.0-beta.8` when upstream ships a stable v2; until then,
@@ -106,6 +102,11 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-042** `config init` resolves its path like everything else, instead of ignoring
+  `BIFROST_CONFIG` and writing the template where the next command will not look for it.
+  `DefaultConfigPath` is gone rather than left beside the fix, being the trap that caused it.
+  ↳ done 2026-08-02 · evidence: found by hitting it while testing T-027; two tests now pin the
+  precedence, both of which fail against the old path resolution. v1.25.1
 - **T-027** OAuth2 for IMAP and SMTP, by the helper-command model: an account names a command
   that prints an access token, and Bifrost acquires nothing itself. XOAUTH2 is implemented here
   (go-sasl has only OAUTHBEARER) because it is the one Microsoft 365 requires and Gmail also
