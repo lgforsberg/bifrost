@@ -93,7 +93,8 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 - **T-025** `FetchThread` rework: iterative reference expansion (current single hop misses
   distant thread members), envelope-only discovery instead of full-body fetches, and
   `slices.SortFunc` over the hand-rolled insertion sort.
-  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/imap.go:FetchThread`
+  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-02 · ref `mail/imap.go:FetchThread`
+
 ## GATED
 
 - **T-027** 🧭 OAuth2 (XOAUTH2/OAUTHBEARER) for IMAP and SMTP; Gmail and Microsoft 365 have
