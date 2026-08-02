@@ -3,6 +3,7 @@ package mail
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -619,4 +620,114 @@ func TestFolderOperations(t *testing.T) {
 	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("error %v should report not found", err)
 	}
+}
+
+// threadMessage builds one link in a chain: it names its parent in In-Reply-To
+// and lists only that parent in References, the way a client that truncates
+// the header does. A member two hops away is then reachable only through its
+// neighbour, which is what a single-hop search misses.
+func threadMessage(id, parent, subject string, hour int) string {
+	msg := "From: alice@example.com\r\n" +
+		"To: " + testIMAPUser + "\r\n" +
+		"Subject: " + subject + "\r\n" +
+		"Message-ID: <" + id + "@example.com>\r\n" +
+		fmt.Sprintf("Date: Mon, 01 Jun 2026 %02d:00:00 +0000\r\n", hour)
+	if parent != "" {
+		msg += "In-Reply-To: <" + parent + "@example.com>\r\n" +
+			"References: <" + parent + "@example.com>\r\n"
+	}
+	return msg + "\r\nBody of " + subject + "\r\n"
+}
+
+// A chain of five where each message names only its immediate parent. The
+// single-hop version reached the target's parent and its direct children and
+// stopped, so the ends of a long conversation were missing.
+func TestFetchThread_ReachesDistantMembers(t *testing.T) {
+	client, _ := newTestIMAPClient(t, AccountConfig{})
+	ctx := context.Background()
+
+	appendRawTestMessage(t, client, "INBOX", threadMessage("one", "", "Proposal", 9), []string{"\\Seen"})
+	appendRawTestMessage(t, client, "INBOX", threadMessage("two", "one", "Re: Proposal", 10), []string{"\\Seen"})
+	middle := appendRawTestMessage(t, client, "INBOX", threadMessage("three", "two", "Re: Proposal (3)", 11), []string{"\\Seen"})
+	appendRawTestMessage(t, client, "INBOX", threadMessage("four", "three", "Re: Proposal (4)", 12), []string{"\\Seen"})
+	appendRawTestMessage(t, client, "INBOX", threadMessage("five", "four", "Re: Proposal (5)", 13), []string{"\\Seen"})
+
+	// Something in the same folder that belongs to no thread, to catch a
+	// search that is too eager rather than too narrow.
+	appendRawTestMessage(t, client, "INBOX", threadMessage("other", "", "Unrelated", 14), []string{"\\Seen"})
+
+	// Asked from the middle, so the walk has to go both up and down.
+	thread, err := client.FetchThread(ctx, []string{"INBOX"}, middle)
+	if err != nil {
+		t.Fatalf("FetchThread: %v", err)
+	}
+
+	want := []string{"Proposal", "Re: Proposal", "Re: Proposal (3)", "Re: Proposal (4)", "Re: Proposal (5)"}
+	got := make([]string, len(thread))
+	for i, msg := range thread {
+		got[i] = msg.Subject
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("thread reads %v, want %v", got, want)
+	}
+}
+
+// Members can live in different folders, which is the point of taking a list.
+func TestFetchThread_SpansFolders(t *testing.T) {
+	client, _ := newTestIMAPClient(t, AccountConfig{})
+	ctx := context.Background()
+
+	if err := client.CreateFolder(ctx, "Sent"); err != nil {
+		t.Fatalf("CreateFolder: %v", err)
+	}
+
+	uid := appendRawTestMessage(t, client, "INBOX", threadMessage("one", "", "Proposal", 9), []string{"\\Seen"})
+	appendRawTestMessage(t, client, "Sent", threadMessage("two", "one", "Re: Proposal", 10), []string{"\\Seen"})
+	appendRawTestMessage(t, client, "INBOX", threadMessage("three", "two", "Re: Proposal (3)", 11), []string{"\\Seen"})
+
+	thread, err := client.FetchThread(ctx, []string{"INBOX", "Sent"}, uid)
+	if err != nil {
+		t.Fatalf("FetchThread: %v", err)
+	}
+	if len(thread) != 3 {
+		t.Fatalf("thread has %d messages, want 3: %v", len(thread), subjectsOfMessages(thread))
+	}
+
+	// Each member says where it is, which is what makes the UIDs usable.
+	for _, msg := range thread {
+		if msg.Folder == "" {
+			t.Errorf("%q does not say which folder it is in", msg.Subject)
+		}
+	}
+	if thread[1].Folder != "Sent" {
+		t.Errorf("the reply is in %q, want Sent", thread[1].Folder)
+	}
+}
+
+// A message with no identifiers of its own cannot be matched to anything, and
+// the walk should not go looking.
+func TestFetchThread_LoneMessage(t *testing.T) {
+	client, _ := newTestIMAPClient(t, AccountConfig{})
+	ctx := context.Background()
+
+	raw := "From: alice@example.com\r\nTo: " + testIMAPUser +
+		"\r\nSubject: No identifier\r\nDate: Mon, 01 Jun 2026 09:00:00 +0000\r\n\r\nBody.\r\n"
+	uid := appendRawTestMessage(t, client, "INBOX", raw, []string{"\\Seen"})
+	appendRawTestMessage(t, client, "INBOX", threadMessage("other", "", "Unrelated", 10), []string{"\\Seen"})
+
+	thread, err := client.FetchThread(ctx, []string{"INBOX"}, uid)
+	if err != nil {
+		t.Fatalf("FetchThread: %v", err)
+	}
+	if len(thread) != 1 || thread[0].Subject != "No identifier" {
+		t.Errorf("thread is %v, want the one message", subjectsOfMessages(thread))
+	}
+}
+
+func subjectsOfMessages(messages []Message) []string {
+	out := make([]string, len(messages))
+	for i, m := range messages {
+		out[i] = m.Subject
+	}
+	return out
 }

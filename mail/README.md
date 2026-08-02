@@ -236,7 +236,11 @@ Server-side IMAP SEARCH. Supports text fields, date ranges, flags, and IMAP keyw
 func (c *IMAPClient) FetchThread(ctx context.Context, folders []string, uid uint32) ([]Message, error)
 ```
 
-Reconstructs a conversation by following `In-Reply-To` and `References` headers across multiple folders. Returns messages sorted chronologically.
+Reconstructs a conversation by following `In-Reply-To` and `References` headers across multiple folders. Returns messages sorted chronologically, each tagged with the folder it was found in.
+
+Expansion is iterative: identifiers found on one message become search terms for the next round, so a chain holds together even where a client truncated `References` and each message names only its parent. An identifier is searched for once, so the walk terminates on its own; the round and message caps are backstops against a reference loop or a mailing list.
+
+Discovery reads envelopes and the `References` header, never a body. Full messages are fetched once each, only for confirmed members.
 
 ### Flag Operations
 

@@ -6,6 +6,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-08-02
+
+### Fixed
+
+- `thread` reached only one hop from the message asked about, so a
+  conversation whose members name just their immediate parent, which is what
+  a client that truncates `References` leaves behind, was returned with both
+  ends missing. Expansion is now iterative: identifiers found on one message
+  become the next round's search terms.
+
+### Changed
+
+- Thread discovery reads envelopes and the `References` header instead of
+  fetching whole messages. It used to pull each candidate in full,
+  attachments and all, once for every search that matched it, which for a
+  three-header search over several identifiers meant the same message
+  downloaded repeatedly. Full messages are now fetched once each, only for
+  confirmed members.
+- A thread is capped at 200 messages so a mailing list cannot turn one
+  command into an unbounded download.
+
 ## [1.23.0] - 2026-08-02
 
 ### Added
@@ -526,7 +547,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.23.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.24.0...HEAD
+[1.24.0]: https://github.com/lgforsberg/bifrost/compare/v1.23.0...v1.24.0
 [1.23.0]: https://github.com/lgforsberg/bifrost/compare/v1.22.0...v1.23.0
 [1.22.0]: https://github.com/lgforsberg/bifrost/compare/v1.21.0...v1.22.0
 [1.21.0]: https://github.com/lgforsberg/bifrost/compare/v1.20.0...v1.21.0

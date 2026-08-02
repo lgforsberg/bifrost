@@ -645,92 +645,199 @@ func (c *IMAPClient) FetchThread(ctx context.Context, folders []string, uid uint
 	}
 	target.Folder = folders[0]
 
-	messageIDs := make(map[string]bool)
-	if target.MessageID != "" {
-		messageIDs[target.MessageID] = true
-	}
-	for _, ref := range target.References {
-		messageIDs[ref] = true
-	}
-	if target.InReplyTo != "" {
-		messageIDs[target.InReplyTo] = true
-	}
-
-	if len(messageIDs) == 0 {
+	// The identifiers to search for first: what the target calls itself, and
+	// everything it names as an ancestor. A message that carries none is a
+	// thread of one, there being nothing to match anything else against.
+	frontier := dedupeIDs(append(append([]string{target.MessageID}, target.References...), target.InReplyTo), nil)
+	if len(frontier) == 0 {
 		return []Message{*target}, nil
 	}
 
-	seen := make(map[string]*Message)
+	found := map[string]threadMember{}
 	if target.MessageID != "" {
-		seen[target.MessageID] = target
+		found[target.MessageID] = threadMember{folder: folders[0], uid: uid}
 	}
 
+	// Each round searches for what the previous one turned up. A thread whose
+	// members all carry the full ancestry is exhausted in one, but clients
+	// that truncate References leave members reachable only through their
+	// neighbours, and a single hop used to lose them.
+	searched := map[string]bool{}
+	for round := 0; round < maxThreadRounds && len(frontier) > 0; round++ {
+		for _, id := range frontier {
+			searched[id] = true
+		}
+		frontier = dedupeIDs(c.expandThread(ctx, folders, frontier, found), searched)
+
+		if ctx.Err() != nil || len(found) >= maxThreadMessages {
+			break
+		}
+	}
+
+	return c.fetchThreadBodies(ctx, found, target), nil
+}
+
+// expandThread searches every folder for the identifiers in frontier, records
+// where each match lives, and returns the identifiers those matches bring in.
+//
+// Discovery never fetches a body. What it needs is the envelope, which the
+// server has already parsed, and the References header, which the envelope
+// does not carry. The version before this fetched every hit in full,
+// attachments included, and did it once per search that matched.
+func (c *IMAPClient) expandThread(ctx context.Context, folders, frontier []string, found map[string]threadMember) []string {
+	var next []string
+
 	for _, folder := range folders {
+		if ctx.Err() != nil || len(found) >= maxThreadMessages {
+			return next
+		}
+		if _, err := c.client.Select(folder, nil).Wait(); err != nil {
+			c.logger.Debug("skipping folder for thread search", "folder", folder, "err", err)
+			continue
+		}
+
+		for _, id := range frontier {
+			if ctx.Err() != nil || len(found) >= maxThreadMessages {
+				return next
+			}
+
+			candidates, err := c.searchThreadHeaders(folder, id)
+			if err != nil {
+				c.logger.Debug("thread search failed", "folder", folder, "id", id, "err", err)
+				continue
+			}
+
+			for _, cand := range candidates {
+				// Without an identifier there is nothing to key the message
+				// by and nothing to expand from, so it cannot take part.
+				if cand.messageID == "" {
+					continue
+				}
+				if _, already := found[cand.messageID]; already {
+					continue
+				}
+
+				found[cand.messageID] = threadMember{folder: folder, uid: cand.uid}
+				next = append(next, cand.messageID)
+				next = append(next, cand.references...)
+
+				if len(found) >= maxThreadMessages {
+					c.logger.Debug("thread truncated", "limit", maxThreadMessages)
+					return next
+				}
+			}
+		}
+	}
+	return next
+}
+
+// searchThreadHeaders finds messages in the selected folder that mention id in
+// any of the three headers that tie a thread together, and reads back only
+// enough of each to carry on.
+func (c *IMAPClient) searchThreadHeaders(folder, id string) ([]threadCandidate, error) {
+	// Three searches rather than one with a nested OR. A SEARCH that returns
+	// identifiers is cheap and the FETCH that follows is not, so the union is
+	// what matters, and it is fetched once. Nesting OR is legal but not worth
+	// depending on when the saving is a round trip.
+	var uids []imap.UID
+	seen := map[imap.UID]bool{}
+
+	for _, header := range []string{"Message-Id", "References", "In-Reply-To"} {
+		data, err := c.client.UIDSearch(&imap.SearchCriteria{
+			Header: []imap.SearchCriteriaHeaderField{{Key: header, Value: id}},
+		}, nil).Wait()
+		if err != nil {
+			return nil, fmt.Errorf("UID SEARCH %s in %s: %w", header, folder, err)
+		}
+		for _, u := range data.AllUIDs() {
+			if !seen[u] {
+				seen[u] = true
+				uids = append(uids, u)
+			}
+		}
+	}
+
+	if len(uids) == 0 {
+		return nil, nil
+	}
+
+	messages, err := c.client.Fetch(imap.UIDSetNum(uids...), &imap.FetchOptions{
+		UID:      true,
+		Envelope: true,
+		BodySection: []*imap.FetchItemBodySection{{
+			Specifier:    imap.PartSpecifierHeader,
+			HeaderFields: []string{"References"},
+			Peek:         true,
+		}},
+	}).Collect()
+	if err != nil {
+		return nil, fmt.Errorf("FETCH thread headers in %s: %w", folder, err)
+	}
+
+	candidates := make([]threadCandidate, 0, len(messages))
+	for _, msg := range messages {
+		cand := threadCandidate{uid: uint32(msg.UID)}
+		if msg.Envelope != nil {
+			cand.messageID = msg.Envelope.MessageID
+			cand.references = append(cand.references, msg.Envelope.InReplyTo...)
+		}
+		for _, section := range msg.BodySection {
+			cand.references = append(cand.references, referencesFrom(section.Bytes)...)
+			break
+		}
+		candidates = append(candidates, cand)
+	}
+	return candidates, nil
+}
+
+// fetchThreadBodies pulls the full message for each member discovery located,
+// oldest first. The target is already in hand and is not fetched twice.
+func (c *IMAPClient) fetchThreadBodies(ctx context.Context, found map[string]threadMember, target *Message) []Message {
+	messages := make([]Message, 0, len(found)+1)
+	messages = append(messages, *target)
+
+	for id, at := range found {
 		if ctx.Err() != nil {
 			break
 		}
-		for mid := range messageIDs {
-			if ctx.Err() != nil {
-				break
-			}
-			if mid == "" {
-				continue
-			}
-			c.searchAndCollect(ctx, folder, &imap.SearchCriteria{
-				Header: []imap.SearchCriteriaHeaderField{{Key: "Message-ID", Value: mid}},
-			}, seen)
-			c.searchAndCollect(ctx, folder, &imap.SearchCriteria{
-				Header: []imap.SearchCriteriaHeaderField{{Key: "References", Value: mid}},
-			}, seen)
-			c.searchAndCollect(ctx, folder, &imap.SearchCriteria{
-				Header: []imap.SearchCriteriaHeaderField{{Key: "In-Reply-To", Value: mid}},
-			}, seen)
+		if id == target.MessageID {
+			continue
 		}
-	}
 
-	messages := make([]Message, 0, len(seen))
-	for _, msg := range seen {
+		msg, err := c.FetchMessage(ctx, at.folder, at.uid, true)
+		if err != nil {
+			c.logger.Debug("thread fetch failed", "folder", at.folder, "uid", at.uid, "err", err)
+			continue
+		}
+		msg.Folder = at.folder
 		messages = append(messages, *msg)
 	}
 
-	// Insertion sort by date ascending
-	for i := 1; i < len(messages); i++ {
-		for j := i; j > 0 && messages[j].Date.Before(messages[j-1].Date); j-- {
-			messages[j], messages[j-1] = messages[j-1], messages[j]
+	// Identifier breaks the tie so that two runs of the same command agree,
+	// which map iteration on its own would not give.
+	slices.SortFunc(messages, func(a, b Message) int {
+		if c := a.Date.Compare(b.Date); c != 0 {
+			return c
 		}
-	}
-
-	return messages, nil
+		return strings.Compare(a.MessageID, b.MessageID)
+	})
+	return messages
 }
 
-func (c *IMAPClient) searchAndCollect(ctx context.Context, folder string, sc *imap.SearchCriteria, seen map[string]*Message) {
-	if ctx.Err() != nil {
-		return
-	}
-	if _, err := c.client.Select(folder, nil).Wait(); err != nil {
-		c.logger.Debug("skipping folder for thread search", "folder", folder, "err", err)
-		return
-	}
+// dedupeIDs returns the non-empty identifiers in ids, each once, leaving out
+// any that excluded already covers.
+func dedupeIDs(ids []string, excluded map[string]bool) []string {
+	out := make([]string, 0, len(ids))
+	seen := make(map[string]bool, len(ids))
 
-	data, err := c.client.UIDSearch(sc, nil).Wait()
-	if err != nil {
-		c.logger.Debug("thread search failed", "folder", folder, "err", err)
-		return
-	}
-
-	for _, uid := range data.AllUIDs() {
-		msg, err := c.FetchMessage(ctx, folder, uint32(uid), true)
-		if err != nil {
-			c.logger.Debug("thread fetch failed", "folder", folder, "uid", uid, "err", err)
+	for _, id := range ids {
+		if id == "" || seen[id] || excluded[id] {
 			continue
 		}
-		if msg.MessageID != "" {
-			if _, exists := seen[msg.MessageID]; !exists {
-				msg.Folder = folder
-				seen[msg.MessageID] = msg
-			}
-		}
+		seen[id] = true
+		out = append(out, id)
 	}
+	return out
 }
 
 // SelectableFolders names every folder that can actually hold messages. It is
@@ -903,6 +1010,37 @@ func buildIMAPSearchCriteria(criteria SearchCriteria) *imap.SearchCriteria {
 	}
 
 	return sc
+}
+
+const (
+	// maxThreadRounds bounds the reference expansion. It is a backstop rather
+	// than the real limit: an identifier is only ever searched for once, so
+	// the walk runs out of new ones and stops on its own. What it costs is
+	// round trips, and a thread whose members carry the full ancestry, which
+	// is what the standard asks for, is done in one round however high this
+	// is. The rounds are spent on chains left by clients that truncate
+	// References, where each message reaches only its neighbour and the walk
+	// advances one hop in each direction per round.
+	maxThreadRounds = 16
+
+	// maxThreadMessages is the real bound on the work. It stops a mailing
+	// list or a reference loop turning one command into an unbounded
+	// download.
+	maxThreadMessages = 200
+)
+
+// threadMember is where a message was found, before its body is fetched.
+type threadMember struct {
+	folder string
+	uid    uint32
+}
+
+// threadCandidate is what discovery learns about a message without reading it:
+// what it calls itself, and what it says came before.
+type threadCandidate struct {
+	uid        uint32
+	messageID  string
+	references []string
 }
 
 // clampToUint32 narrows a count or size the protocol hands over as a wider

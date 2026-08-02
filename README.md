@@ -370,6 +370,8 @@ bifrost thread [--folders FOLDER1,FOLDER2,...] [--with-attachment-data] <uid>
 
 Reconstructs a conversation by following `References`/`In-Reply-To` across the given folders (default `INBOX,Sent`). JSON output is chronological, each message tagged with its `folder`. Attachment bytes are excluded by default, as in `read`.
 
+Following is iterative: identifiers found on one message are searched for in turn, so a conversation holds together even where a client has truncated `References` and each message names only its immediate parent. A thread is capped at 200 messages, which a mailing list can otherwise exceed.
+
 #### `send` — Compose and send
 
 ```

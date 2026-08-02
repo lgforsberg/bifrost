@@ -90,11 +90,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   the six-line inline/attachment split from go-message's `mail` reader. Deliberately not bundled
   into T-032: swapping the walk is a structural change, not a bug fix.
   ↳ since 2026-08-02 · pushed 0 · size M · verified 2026-08-02 · ref `mail/mime.go:ParseMessage part walk`
-- **T-025** `FetchThread` rework: iterative reference expansion (current single hop misses
-  distant thread members), envelope-only discovery instead of full-body fetches, and
-  `slices.SortFunc` over the hand-rolled insertion sort.
-  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-02 · ref `mail/imap.go:FetchThread`
-
 ## GATED
 
 - **T-027** 🧭 OAuth2 (XOAUTH2/OAUTHBEARER) for IMAP and SMTP; Gmail and Microsoft 365 have
@@ -117,6 +112,13 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-025** `FetchThread` reworked: iterative reference expansion, header-only discovery, and
+  `slices.SortFunc`. Discovery no longer downloads a candidate's body once per search that
+  matched it. Round and message caps are backstops; the walk terminates because an identifier is
+  searched for once.
+  ↳ done 2026-08-02 · evidence: a five-message chain where each names only its parent, asked from
+  the middle, which returns three of five with the rounds capped at one and all five otherwise;
+  plus tests for spanning folders and for a message with no identifiers. v1.24.0
 - **T-033** Network timeouts configurable via `timeout` in the config (defaults or per account)
   and `--timeout` for one invocation. One number replaces both the dial and the idle deadline;
   unset keeps the existing 30s and 60s. T-029 will still need the read deadline lifted rather

@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -164,6 +165,26 @@ func ParseMessage(r io.Reader) (*Message, error) {
 }
 
 // contentTypeFromFilename returns a MIME type based on file extension.
+// referencesFrom reads the References header out of a fetched header block.
+// It exists because the IMAP envelope carries Message-ID and In-Reply-To but
+// not References, which is the header that names a message's whole ancestry
+// and so the one that reaches the far end of a thread.
+func referencesFrom(headerBlock []byte) []string {
+	// The block is headers and a blank line, so there is no body to fail on:
+	// an error here means the headers themselves were unreadable, and there is
+	// nothing to recover.
+	e, err := message.Read(bytes.NewReader(headerBlock))
+	if e == nil || err != nil {
+		return nil
+	}
+
+	refs, err := mail.NewReader(e).Header.MsgIDList("References")
+	if err != nil {
+		return nil
+	}
+	return refs
+}
+
 func contentTypeFromFilename(filename string) string {
 	ct := mime.TypeByExtension(filepath.Ext(filename))
 	if ct == "" {
