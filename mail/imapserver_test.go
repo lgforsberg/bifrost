@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -18,11 +19,63 @@ const (
 	testIMAPPass = "secret"
 )
 
-// newTestIMAPClient starts an in-memory IMAP server and returns a client
-// connected to it, plus the user so a test can seed mailboxes directly. The
-// server speaks IMAP4rev2, which is what brings MOVE and UIDPLUS: the client
-// needs both.
+// serverHooks make the memory server do two things it has no way to express on
+// its own, both of which real servers do.
+type serverHooks struct {
+	// listing replaces what LIST reports. imapmemserver never sets special-use
+	// attributes, so this is the only way to hand the client a mailbox that
+	// says what it is for. Mailboxes still have to exist for anything beyond
+	// resolving a name.
+	listing []imap.ListData
+
+	// refuseDelete fails STORE +\Deleted, which is how a mailbox nobody may
+	// delete from behaves. Only that flag is refused, so appending and reading
+	// still work.
+	refuseDelete bool
+}
+
+// hookedSession is the embedding imapmemserver documents: everything is
+// promoted from UserSession, including MOVE, and the hooks override two
+// commands.
+type hookedSession struct {
+	*imapmemserver.UserSession
+	hooks serverHooks
+}
+
+var _ imapserver.SessionIMAP4rev2 = (*hookedSession)(nil)
+
+func (s *hookedSession) List(w *imapserver.ListWriter, ref string, patterns []string, options *imap.ListOptions) error {
+	if s.hooks.listing == nil {
+		return s.UserSession.List(w, ref, patterns, options)
+	}
+	for i := range s.hooks.listing {
+		if err := w.WriteList(&s.hooks.listing[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *hookedSession) Store(w *imapserver.FetchWriter, numSet imap.NumSet, flags *imap.StoreFlags, options *imap.StoreOptions) error {
+	if s.hooks.refuseDelete && flags != nil && slices.Contains(flags.Flags, imap.FlagDeleted) {
+		return &imap.Error{
+			Type: imap.StatusResponseTypeNo,
+			Text: "Permission denied",
+		}
+	}
+	return s.UserSession.Store(w, numSet, flags, options)
+}
+
 func newTestIMAPClient(t *testing.T, account AccountConfig) (*IMAPClient, *imapmemserver.User) {
+	t.Helper()
+	return newTestIMAPClientWithHooks(t, account, serverHooks{})
+}
+
+// newTestIMAPClientWithHooks starts an in-memory IMAP server and returns a
+// client connected to it, plus the user so a test can seed mailboxes directly.
+// The server speaks IMAP4rev2, which is what brings MOVE and UIDPLUS: the
+// client needs both.
+func newTestIMAPClientWithHooks(t *testing.T, account AccountConfig, hooks serverHooks) (*IMAPClient, *imapmemserver.User) {
 	t.Helper()
 
 	user := imapmemserver.NewUser(testIMAPUser, testIMAPPass)
@@ -30,12 +83,12 @@ func newTestIMAPClient(t *testing.T, account AccountConfig) (*IMAPClient, *imapm
 		t.Fatalf("creating INBOX: %v", err)
 	}
 
-	mem := imapmemserver.New()
-	mem.AddUser(user)
-
 	srv := imapserver.New(&imapserver.Options{
 		NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
-			return mem.NewSession(), nil, nil
+			return &hookedSession{
+				UserSession: imapmemserver.NewUserSession(user),
+				hooks:       hooks,
+			}, nil, nil
 		},
 		Caps:         imap.CapSet{imap.CapIMAP4rev1: {}, imap.CapIMAP4rev2: {}},
 		InsecureAuth: true,
@@ -75,6 +128,11 @@ func newTestIMAPClient(t *testing.T, account AccountConfig) (*IMAPClient, *imapm
 // appendTestMessage puts a minimal message in a mailbox and returns its UID.
 func appendTestMessage(t *testing.T, c *IMAPClient, folder, subject string) uint32 {
 	t.Helper()
+	return appendTestMessageWithFlags(t, c, folder, subject, []string{"\\Seen"})
+}
+
+func appendTestMessageWithFlags(t *testing.T, c *IMAPClient, folder, subject string, flags []string) uint32 {
+	t.Helper()
 
 	raw := "From: alice@example.com\r\n" +
 		"To: " + testIMAPUser + "\r\n" +
@@ -82,11 +140,25 @@ func appendTestMessage(t *testing.T, c *IMAPClient, folder, subject string) uint
 		"\r\n" +
 		"Body of " + subject + "\r\n"
 
-	uid, err := c.AppendMessage(context.Background(), folder, []byte(raw), []string{"\\Seen"})
+	return appendRawTestMessage(t, c, folder, raw, flags)
+}
+
+func appendRawTestMessage(t *testing.T, c *IMAPClient, folder, raw string, flags []string) uint32 {
+	t.Helper()
+
+	uid, err := c.AppendMessage(context.Background(), folder, []byte(raw), flags)
 	if err != nil {
 		t.Fatalf("appending to %s: %v", folder, err)
 	}
 	return uid
+}
+
+func subjectsOf(envelopes []Envelope) []string {
+	subjects := make([]string, len(envelopes))
+	for i, e := range envelopes {
+		subjects[i] = e.Subject
+	}
+	return subjects
 }
 
 func folderNames(t *testing.T, c *IMAPClient) []string {
@@ -365,6 +437,165 @@ func TestDraft_SaveThenSendLeavesNothingBehind(t *testing.T) {
 	}
 	if len(envelopes) != 1 || envelopes[0].Subject != "Later" {
 		t.Errorf("Sent holds %+v, want the sent draft", envelopes)
+	}
+}
+
+// The attribute is what a real server sends and imapmemserver cannot, so
+// until now only the pure matcher covered this. Here it comes off the wire.
+func TestFindSpecialFolder_ReadsAttributesFromTheServer(t *testing.T) {
+	client, _ := newTestIMAPClientWithHooks(t, AccountConfig{}, serverHooks{
+		listing: []imap.ListData{
+			{Mailbox: "INBOX", Delim: '/'},
+			// A decoy: the conventional English name, on a mailbox that does
+			// not claim to be the archive.
+			{Mailbox: "Archive", Delim: '/'},
+			{Mailbox: "Arkiv", Delim: '/', Attrs: []imap.MailboxAttr{imap.MailboxAttrArchive}},
+			{Mailbox: "Skickat", Delim: '/', Attrs: []imap.MailboxAttr{imap.MailboxAttrSent}},
+			{Mailbox: "Papperskorg", Delim: '/', Attrs: []imap.MailboxAttr{imap.MailboxAttrTrash}},
+			{Mailbox: "Utkast", Delim: '/', Attrs: []imap.MailboxAttr{imap.MailboxAttrDrafts}},
+		},
+	})
+
+	for attr, want := range map[string]string{
+		"\\Archive": "Arkiv",
+		"\\Sent":    "Skickat",
+		"\\Trash":   "Papperskorg",
+		"\\Drafts":  "Utkast",
+	} {
+		got, err := client.FindSpecialFolder(context.Background(), attr)
+		if err != nil {
+			t.Errorf("FindSpecialFolder(%s): %v", attr, err)
+			continue
+		}
+		if got != want {
+			t.Errorf("%s resolved to %q, want %q", attr, got, want)
+		}
+	}
+}
+
+// T-006's other warning path. The message is delivered and filed, and only the
+// draft cannot be cleaned up, which is not worth failing a send over.
+func TestSendDraft_WarnsWhenTheDraftWillNotDelete(t *testing.T) {
+	smtpSrv := newTestSMTPServer(t, smtpFailures{})
+	client, user := newTestIMAPClientWithHooks(t, AccountConfig{}, serverHooks{refuseDelete: true})
+	ctx := context.Background()
+
+	if err := user.Create("Sent", nil); err != nil {
+		t.Fatalf("creating Sent: %v", err)
+	}
+
+	uid, err := SaveDraft(ctx, client, testSendOptions("Stuck"))
+	if err != nil {
+		t.Fatalf("SaveDraft: %v", err)
+	}
+
+	res, err := SendDraft(ctx, smtpAccount(smtpSrv), client, uid, discardLogger())
+	if err != nil {
+		t.Fatalf("SendDraft failed over a draft it could not remove: %v", err)
+	}
+	if len(res.Warnings) != 1 {
+		t.Fatalf("warnings = %v, want one about the draft", res.Warnings)
+	}
+	if !strings.Contains(res.Warnings[0], "sent") || !strings.Contains(res.Warnings[0], "Drafts") {
+		t.Errorf("warning %q should say the message was sent and name the folder", res.Warnings[0])
+	}
+
+	remaining, err := client.CheckUIDsExist(ctx, "Drafts", []uint32{uid})
+	if err != nil {
+		t.Fatalf("CheckUIDsExist: %v", err)
+	}
+	if len(remaining) != 1 {
+		t.Error("the warning claimed the draft was left behind, but it is gone")
+	}
+
+	envelopes, err := client.ListEnvelopes(ctx, "Sent", 10, 0)
+	if err != nil {
+		t.Fatalf("listing Sent: %v", err)
+	}
+	if len(envelopes) != 1 {
+		t.Errorf("Sent holds %d messages, want the one that went out", len(envelopes))
+	}
+}
+
+func TestSearch_Criteria(t *testing.T) {
+	client, _ := newTestIMAPClient(t, AccountConfig{})
+	ctx := context.Background()
+
+	appendTestMessage(t, client, "INBOX", "Invoice 42")
+	appendTestMessage(t, client, "INBOX", "Lunch on Friday")
+	appendTestMessageWithFlags(t, client, "INBOX", "Unread thing", nil)
+
+	tests := map[string]struct {
+		criteria SearchCriteria
+		want     []string
+	}{
+		"by subject": {
+			criteria: SearchCriteria{Subject: "Invoice"},
+			want:     []string{"Invoice 42"},
+		},
+		"by sender, newest first": {
+			criteria: SearchCriteria{From: "alice@example.com"},
+			want:     []string{"Unread thing", "Lunch on Friday", "Invoice 42"},
+		},
+		"unseen only": {
+			criteria: SearchCriteria{Unseen: true},
+			want:     []string{"Unread thing"},
+		},
+		"limit keeps the most recent": {
+			criteria: SearchCriteria{From: "alice@example.com", Limit: 2},
+			want:     []string{"Unread thing", "Lunch on Friday"},
+		},
+		"no match": {
+			criteria: SearchCriteria{Subject: "nothing like this"},
+			want:     []string{},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			envelopes, err := client.Search(ctx, "INBOX", tt.criteria)
+			if err != nil {
+				t.Fatalf("Search: %v", err)
+			}
+			if got := subjectsOf(envelopes); !slices.Equal(got, tt.want) {
+				t.Errorf("found %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFetchThread_CollectsTheReply(t *testing.T) {
+	client, _ := newTestIMAPClient(t, AccountConfig{})
+	ctx := context.Background()
+
+	original := "From: alice@example.com\r\n" +
+		"To: " + testIMAPUser + "\r\n" +
+		"Subject: Proposal\r\n" +
+		"Message-ID: <first@example.com>\r\n" +
+		"Date: Mon, 01 Jun 2026 09:00:00 +0000\r\n" +
+		"\r\nThe proposal.\r\n"
+	reply := "From: " + testIMAPUser + "\r\n" +
+		"To: alice@example.com\r\n" +
+		"Subject: Re: Proposal\r\n" +
+		"Message-ID: <second@example.com>\r\n" +
+		"In-Reply-To: <first@example.com>\r\n" +
+		"References: <first@example.com>\r\n" +
+		"Date: Mon, 01 Jun 2026 10:00:00 +0000\r\n" +
+		"\r\nAgreed.\r\n"
+
+	uid := appendRawTestMessage(t, client, "INBOX", original, []string{"\\Seen"})
+	appendRawTestMessage(t, client, "INBOX", reply, []string{"\\Seen"})
+
+	thread, err := client.FetchThread(ctx, []string{"INBOX"}, uid)
+	if err != nil {
+		t.Fatalf("FetchThread: %v", err)
+	}
+	if len(thread) != 2 {
+		t.Fatalf("thread has %d messages, want 2", len(thread))
+	}
+	// Oldest first, so a reader follows the conversation forwards.
+	if thread[0].Subject != "Proposal" || thread[1].Subject != "Re: Proposal" {
+		t.Errorf("thread reads %q then %q", thread[0].Subject, thread[1].Subject)
 	}
 }
 

@@ -89,15 +89,16 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   - [x] append and fetch, trash, archive, folder create/rename/delete and their error codes
   - [x] the T-006 Sent append warning, and a save-then-send draft round trip across both
         in-process servers
-  - [ ] Search and FetchThread against the server
-  - [ ] a draft that will not delete. `imapmemserver` cannot refuse on demand, so this needs a
-        wrapper session that fails a chosen command
-  - [ ] special-use attributes over the wire. `imapmemserver` never sets them, so `ListFolders`
-        reading them is still only covered by the pure `matchSpecialFolder` test
-  - [ ] golden-file tests for each command's JSON output and error codes
+  - [x] Search across subject, sender, unseen and limit, and a FetchThread that collects a reply
+  - [x] a draft that will not delete, via a session wrapper that refuses `STORE +\Deleted`.
+        That covers T-006's second warning path
+  - [x] special-use attributes over the wire, via the same wrapper replacing what LIST reports.
+        A decoy mailbox named Archive loses to the one advertising `\Archive`
+  - [ ] golden-file tests for each command's JSON output and error codes. Blocked on T-024:
+        commands print straight to `os.Stdout`, so there is nothing to capture
   - [x] `internal/commands` has a test file at all (T-036 added the first four)
-  ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `mail/imapserver_test.go`
-  ↳ took `mail` from 42.9% to 69.5%, and caught T-037 on the first run
+  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-02 · ref `mail/imapserver_test.go`
+  ↳ took `mail` from 42.9% to 80.0%, and caught T-037 on the first run
 ## LATER
 
 - **T-034** `draft send` ignores the `saveToSent` default and has no `--no-save`, so it always
