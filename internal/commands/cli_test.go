@@ -176,6 +176,79 @@ func TestInbox_EmptyFolderIsAnEmptyArray(t *testing.T) {
 	}
 }
 
+// The default shape is the contract every existing script depends on, so the
+// interesting assertion is that asking for the total does not change it for
+// anyone who did not ask.
+func TestInbox_WithTotalIsOptIn(t *testing.T) {
+	cli := newTestCLI(t)
+	cli.seed(t, "INBOX", "First", "Second", "Third")
+
+	if err := Inbox(cli.g, []string{"--limit", "2"}); err != nil {
+		t.Fatalf("inbox: %v", err)
+	}
+	if got := cli.decodeArray(t); len(got) != 2 {
+		t.Fatalf("plain inbox returned %d envelopes, want a bare array of 2", len(got))
+	}
+	cli.out.Reset()
+
+	if err := Inbox(cli.g, []string{"--limit", "2", "--with-total"}); err != nil {
+		t.Fatalf("inbox --with-total: %v", err)
+	}
+	page := cli.decodeObject(t)
+	if page["total"] != float64(3) {
+		t.Errorf("total = %v, want 3", page["total"])
+	}
+	if page["limit"] != float64(2) {
+		t.Errorf("limit = %v, want 2", page["limit"])
+	}
+	if page["offset"] != float64(0) {
+		t.Errorf("offset = %v, want 0", page["offset"])
+	}
+	messages, ok := page["messages"].([]any)
+	if !ok {
+		t.Fatalf("messages is %T, want an array", page["messages"])
+	}
+	if len(messages) != 2 {
+		t.Errorf("got %d messages, want 2", len(messages))
+	}
+}
+
+// Reporting the total is only worth anything if it counts the matches rather
+// than what survived the limit.
+func TestSearch_WithTotalCountsBeyondTheLimit(t *testing.T) {
+	cli := newTestCLI(t)
+	cli.seed(t, "INBOX", "Invoice 1", "Invoice 2", "Invoice 3")
+
+	if err := Search(cli.g, []string{"--subject", "Invoice", "--limit", "1", "--with-total"}); err != nil {
+		t.Fatalf("search --with-total: %v", err)
+	}
+
+	page := cli.decodeObject(t)
+	if page["total"] != float64(3) {
+		t.Errorf("total = %v, want all 3 matches", page["total"])
+	}
+	if messages := page["messages"].([]any); len(messages) != 1 {
+		t.Errorf("got %d messages, want the 1 asked for", len(messages))
+	}
+}
+
+func TestInbox_WithTotalOnAnEmptyFolder(t *testing.T) {
+	cli := newTestCLI(t)
+
+	if err := Inbox(cli.g, []string{"--with-total"}); err != nil {
+		t.Fatalf("inbox --with-total: %v", err)
+	}
+
+	page := cli.decodeObject(t)
+	if page["total"] != float64(0) {
+		t.Errorf("total = %v, want 0", page["total"])
+	}
+	// Still an array rather than null, same as the bare form.
+	if messages, ok := page["messages"].([]any); !ok || len(messages) != 0 {
+		t.Errorf("messages = %v, want an empty array", page["messages"])
+	}
+}
+
 func TestRead_JSON(t *testing.T) {
 	cli := newTestCLI(t)
 	uids := cli.seed(t, "INBOX", "Hello")

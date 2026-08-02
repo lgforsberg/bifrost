@@ -196,7 +196,7 @@ Without `--json`, errors print to stderr as `error: <message>`.
 #### `inbox` — List messages
 
 ```
-bifrost inbox [--folder FOLDER] [--limit N] [--offset N]
+bifrost inbox [--folder FOLDER] [--limit N] [--offset N] [--with-total]
 ```
 
 | Flag | Default | Description |
@@ -204,6 +204,7 @@ bifrost inbox [--folder FOLDER] [--limit N] [--offset N]
 | `--folder` | `INBOX` | Folder to list |
 | `--limit` | `20` | Max messages to return |
 | `--offset` | `0` | Skip N newest messages (for pagination) |
+| `--with-total` | `false` | Report how many the folder holds (see [Knowing when there is more](#knowing-when-there-is-more)) |
 
 JSON output: array of envelope objects.
 
@@ -231,7 +232,7 @@ Attachment bytes are left out of the JSON unless you ask for them: base64 makes 
 ```
 bifrost search [--folder FOLDER] [--from X] [--to X] [--subject X] [--body X]
                [--since YYYY-MM-DD] [--before YYYY-MM-DD] [--unread] [--flagged]
-               [--keyword KEYWORD]... [--limit N]
+               [--keyword KEYWORD]... [--limit N] [--with-total]
 ```
 
 At least one search criterion is required.
@@ -245,6 +246,7 @@ At least one search criterion is required.
 | `--flagged` | `false` | Only flagged messages |
 | `--keyword` | — | IMAP keyword, repeatable; a message must carry all of them |
 | `--limit` | `50` | Max results |
+| `--with-total` | `false` | Report how many matched (see [Knowing when there is more](#knowing-when-there-is-more)) |
 
 `--keyword` is how you find the drafts `draft save --approval` tagged:
 
@@ -253,6 +255,27 @@ bifrost --json search --folder Drafts --keyword '$PendingApproval'
 ```
 
 Quote the keyword in a shell, or `$PendingApproval` expands to nothing.
+
+#### Knowing when there is more
+
+`inbox` and `search` return a bare array, so a page that comes back full looks the same as one that found exactly that many. `--with-total` wraps the result to say how many there were:
+
+```bash
+bifrost --json inbox --limit 20 --with-total
+```
+
+```json
+{
+  "total": 137,
+  "limit": 20,
+  "offset": 0,
+  "messages": [ ... ]
+}
+```
+
+For `inbox`, `total` is how many messages the folder holds; for `search`, how many matched before `--limit` cut the result down. There is more to fetch when `offset + len(messages) < total`. Both numbers are already known by the time the page is built, so the flag costs no extra round trip.
+
+The wrapper is opt-in because the bare array is what every existing script reads, and because `bifrost --json inbox | jq '.[].subject'` is worth keeping. Ask for the total when you are paging or deciding whether to narrow a query, and ignore it otherwise. `search` has no `--offset` yet, so there `total` tells you to narrow the query rather than to page.
 
 #### `thread` — View conversation thread
 

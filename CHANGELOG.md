@@ -6,6 +6,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-08-02
+
+### Added
+
+- `inbox --with-total` and `search --with-total` report how many messages there
+  were before `--limit` cut the result down, so a full page can be told apart
+  from the last one. JSON wraps the array as
+  `{"total":N,"limit":N,"offset":N,"messages":[...]}`; table output gains a
+  "Showing X of Y" footer. Both counts were already known and discarded, so the
+  flag costs no extra round trip.
+- `mail.EnvelopePage`, `mail.IMAPClient.ListEnvelopePage`, and
+  `mail.IMAPClient.SearchPage` expose the same total to library callers.
+
+### Unchanged
+
+- Without `--with-total`, `inbox` and `search` still emit a bare JSON array.
+  The wrapper is opt-in so existing scripts and `jq '.[]'` pipelines keep
+  working. `ListEnvelopes` and `Search` are unchanged for the same reason.
+
 ## [1.12.0] - 2026-08-02
 
 ### Added
@@ -323,7 +342,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.12.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.13.0...HEAD
+[1.13.0]: https://github.com/lgforsberg/bifrost/compare/v1.12.0...v1.13.0
 [1.12.0]: https://github.com/lgforsberg/bifrost/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/lgforsberg/bifrost/compare/v1.10.2...v1.11.0
 [1.10.2]: https://github.com/lgforsberg/bifrost/compare/v1.10.1...v1.10.2

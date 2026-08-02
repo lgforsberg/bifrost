@@ -25,6 +25,7 @@ func Search(g *cmdutil.GlobalFlags, args []string) error {
 	fs.Var(&keywords, "keyword", "IMAP keyword such as $PendingApproval (repeatable, all must match)")
 	folder := fs.String("folder", "INBOX", "folder to search")
 	limit := fs.Int("limit", 50, "max results")
+	withTotal := fs.Bool("with-total", false, "wrap the result to report how many messages matched")
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("usage: %w", err)
 	}
@@ -67,12 +68,16 @@ func Search(g *cmdutil.GlobalFlags, args []string) error {
 	}
 	defer client.Close()
 
-	envelopes, err := client.Search(g.Ctx, *folder, criteria)
+	page, err := client.SearchPage(g.Ctx, *folder, criteria)
 	if err != nil {
 		return err
 	}
+	envelopes := page.Messages
 
 	if g.JSON {
+		if *withTotal {
+			return output.PrintJSON(g.Out(), page)
+		}
 		return output.PrintJSON(g.Out(), envelopes)
 	}
 
@@ -108,5 +113,8 @@ func Search(g *cmdutil.GlobalFlags, args []string) error {
 		}
 	}
 	output.PrintTable(g.Out(), headers, rows)
+	if *withTotal {
+		fmt.Fprintf(g.Out(), "\nShowing %d of %d matches.\n", len(envelopes), page.Total)
+	}
 	return nil
 }

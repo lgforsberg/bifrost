@@ -14,6 +14,7 @@ func Inbox(g *cmdutil.GlobalFlags, args []string) error {
 	folder := fs.String("folder", "INBOX", "folder to list")
 	limit := fs.Int("limit", 20, "max messages to return")
 	offset := fs.Int("offset", 0, "skip N newest messages")
+	withTotal := fs.Bool("with-total", false, "wrap the result to report how many messages the folder holds")
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("usage: %w", err)
 	}
@@ -24,12 +25,16 @@ func Inbox(g *cmdutil.GlobalFlags, args []string) error {
 	}
 	defer client.Close()
 
-	envelopes, err := client.ListEnvelopes(g.Ctx, *folder, *limit, *offset)
+	page, err := client.ListEnvelopePage(g.Ctx, *folder, *limit, *offset)
 	if err != nil {
 		return err
 	}
+	envelopes := page.Messages
 
 	if g.JSON {
+		if *withTotal {
+			return output.PrintJSON(g.Out(), page)
+		}
 		return output.PrintJSON(g.Out(), envelopes)
 	}
 
@@ -71,6 +76,9 @@ func Inbox(g *cmdutil.GlobalFlags, args []string) error {
 		}
 	}
 	output.PrintTable(g.Out(), headers, rows)
+	if *withTotal {
+		fmt.Fprintf(g.Out(), "\nShowing %d of %d.\n", len(envelopes), page.Total)
+	}
 	return nil
 }
 

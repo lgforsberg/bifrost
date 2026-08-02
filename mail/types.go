@@ -73,6 +73,21 @@ type Envelope struct {
 	Size    uint32    `json:"size"`
 }
 
+// EnvelopePage is a window onto a larger set: the envelopes that were asked
+// for, and how many there were before the limit was applied. Total is the
+// point of it, since a bare page cannot tell a caller whether it is looking at
+// everything or at the first twenty of nine hundred.
+//
+// For a folder listing Total is how many messages the folder holds; for a
+// search it is how many matched. Both are free, being already known by the
+// time the page is built.
+type EnvelopePage struct {
+	Total    uint32     `json:"total"`
+	Limit    int        `json:"limit"`
+	Offset   int        `json:"offset"`
+	Messages []Envelope `json:"messages"`
+}
+
 type Message struct {
 	Envelope
 	// Bcc sits here rather than on Envelope because it is only ever known from

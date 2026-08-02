@@ -3,7 +3,7 @@
 **This file is the single source of truth for what we are working on.** If a task is not
 here, it is not tracked. If it is here, its phase and metadata are current.
 
-> **Next free ID: `T-039`** · IDs are never reused · last full verification sweep **2026-08-01**
+> **Next free ID: `T-040`** · IDs are never reused · last full verification sweep **2026-08-01**
 
 ## How to use this file
 
@@ -108,9 +108,11 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 - **T-021** Cross-folder search (repeatable `--folder` or `--all-folders`); triage across
   folders currently needs one invocation per folder.
   ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `internal/commands/search.go`
-- **T-022** 🧭 Pagination metadata in `inbox`/`search` JSON (folder total is already returned by
-  SELECT and discarded). Changes the output shape from a bare array, needs a call on format.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `mail/imap.go:ListEnvelopes`
+- **T-039** `bifrost inbox --help` fails with a config error instead of printing the flags: config
+  is loaded during dispatch, before the subcommand parses anything, so no per-command help is
+  reachable without a working account. Discovering what a command takes should not require
+  credentials. Parse for `-h`/`--help` before loading, or defer the load until after `fs.Parse`.
+  ↳ since 2026-08-02 · pushed 0 · size S · verified 2026-08-02 · ref `cmd/bifrost/main.go` dispatch
 - **T-023** `draft update <uid>`: append the revised draft and delete the old one in a single
   command so agent revision loops are not save-new-then-delete-old by hand.
   ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `internal/commands/draft.go`
@@ -151,6 +153,14 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-022** Pagination metadata behind `--with-total` on `inbox` and `search`, rather than changing
+  the default shape. Three things ruled out breaking the bare array: it is the contract every
+  existing script reads, the module version covers `package mail` too (so a breaking CLI change
+  would force `/v2` on library users it does not affect), and the CLI already had this idiom in
+  `--with-attachment-data`. The counts were free, both being computed and discarded already.
+  `ListEnvelopes` and `Search` keep their signatures and delegate to the new page methods.
+  ↳ done 2026-08-02 · evidence: three command tests covering the default array staying bare, the
+  search total counting past the limit, and an empty folder still reporting an array. v1.13.0
 - **T-017** `draft send` refuses a draft still tagged `$PendingApproval`, reporting the new
   `PENDING_APPROVAL` code. Refusing rather than warning, since a warning on stderr does not stop
   a script. The task did not ask for `draft approve`, but refusing with no way to clear the

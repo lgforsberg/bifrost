@@ -111,24 +111,37 @@ func (c *IMAPClient) ListFolders(ctx context.Context) ([]Folder, error) {
 }
 
 func (c *IMAPClient) ListEnvelopes(ctx context.Context, folder string, limit, offset int) ([]Envelope, error) {
+	page, err := c.ListEnvelopePage(ctx, folder, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	return page.Messages, nil
+}
+
+// ListEnvelopePage is ListEnvelopes plus the folder's message count, which
+// SELECT reports anyway. Without it a caller cannot tell a full page from the
+// last one.
+func (c *IMAPClient) ListEnvelopePage(ctx context.Context, folder string, limit, offset int) (EnvelopePage, error) {
 	c.logger.Debug("listing envelopes", "folder", folder, "limit", limit, "offset", offset)
 
 	mbox, err := c.client.Select(folder, nil).Wait()
 	if err != nil {
 		if isNoSuchMailbox(err) {
-			return nil, fmt.Errorf("folder %q: %w", folder, ErrNotFound)
+			return EnvelopePage{}, fmt.Errorf("folder %q: %w", folder, ErrNotFound)
 		}
-		return nil, fmt.Errorf("SELECT %s: %w", folder, err)
+		return EnvelopePage{}, fmt.Errorf("SELECT %s: %w", folder, err)
 	}
 
 	total := mbox.NumMessages
+	page := EnvelopePage{Total: total, Limit: limit, Offset: offset, Messages: []Envelope{}}
+
 	if total == 0 || limit <= 0 {
-		return []Envelope{}, nil
+		return page, nil
 	}
 
 	end := int(total) - offset
 	if end <= 0 {
-		return []Envelope{}, nil
+		return page, nil
 	}
 	start := end - limit + 1
 	if start < 1 {
@@ -147,7 +160,7 @@ func (c *IMAPClient) ListEnvelopes(ctx context.Context, folder string, limit, of
 
 	messages, err := c.client.Fetch(*seqSet, fetchOpts).Collect()
 	if err != nil {
-		return nil, fmt.Errorf("FETCH envelopes: %w", err)
+		return EnvelopePage{}, fmt.Errorf("FETCH envelopes: %w", err)
 	}
 
 	// Return newest-first
@@ -155,7 +168,8 @@ func (c *IMAPClient) ListEnvelopes(ctx context.Context, folder string, limit, of
 	for i := len(messages) - 1; i >= 0; i-- {
 		envelopes = append(envelopes, imapEnvelopeToEnvelope(messages[i]))
 	}
-	return envelopes, nil
+	page.Messages = envelopes
+	return page, nil
 }
 
 func (c *IMAPClient) FetchMessage(ctx context.Context, folder string, uid uint32, peek bool) (*Message, error) {
@@ -436,21 +450,38 @@ func (c *IMAPClient) AppendMessage(ctx context.Context, folder string, message [
 }
 
 func (c *IMAPClient) Search(ctx context.Context, folder string, criteria SearchCriteria) ([]Envelope, error) {
+	page, err := c.SearchPage(ctx, folder, criteria)
+	if err != nil {
+		return nil, err
+	}
+	return page.Messages, nil
+}
+
+// SearchPage is Search plus how many messages matched before the limit cut the
+// result down. A search that quietly returns its limit looks the same as one
+// that found exactly that many.
+func (c *IMAPClient) SearchPage(ctx context.Context, folder string, criteria SearchCriteria) (EnvelopePage, error) {
 	c.logger.Debug("searching", "folder", folder)
 
 	if _, err := c.client.Select(folder, nil).Wait(); err != nil {
-		return nil, fmt.Errorf("SELECT %s: %w", folder, err)
+		return EnvelopePage{}, fmt.Errorf("SELECT %s: %w", folder, err)
 	}
 
 	sc := buildIMAPSearchCriteria(criteria)
 	data, err := c.client.UIDSearch(sc, nil).Wait()
 	if err != nil {
-		return nil, fmt.Errorf("UID SEARCH: %w", err)
+		return EnvelopePage{}, fmt.Errorf("UID SEARCH: %w", err)
 	}
 
 	allUIDs := data.AllUIDs()
+	page := EnvelopePage{
+		Total:    uint32(len(allUIDs)),
+		Limit:    criteria.Limit,
+		Messages: []Envelope{},
+	}
+
 	if len(allUIDs) == 0 {
-		return []Envelope{}, nil
+		return page, nil
 	}
 
 	if criteria.Limit > 0 && len(allUIDs) > criteria.Limit {
@@ -471,14 +502,15 @@ func (c *IMAPClient) Search(ctx context.Context, folder string, criteria SearchC
 
 	messages, err := c.client.Fetch(*uidSet, fetchOpts).Collect()
 	if err != nil {
-		return nil, fmt.Errorf("FETCH search results: %w", err)
+		return EnvelopePage{}, fmt.Errorf("FETCH search results: %w", err)
 	}
 
 	envelopes := make([]Envelope, 0, len(messages))
 	for i := len(messages) - 1; i >= 0; i-- {
 		envelopes = append(envelopes, imapEnvelopeToEnvelope(messages[i]))
 	}
-	return envelopes, nil
+	page.Messages = envelopes
+	return page, nil
 }
 
 func (c *IMAPClient) FetchThread(ctx context.Context, folders []string, uid uint32) ([]Message, error) {
