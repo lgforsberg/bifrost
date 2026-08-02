@@ -314,6 +314,8 @@ Builds a complete RFC 2822 message from `SendOptions`. Generates MIME multipart 
 
 No `Bcc` header is written. Blind-copied recipients belong in the SMTP envelope, which `Send` populates from `SendOptions.Bcc`; writing the header would disclose them to every other recipient. Copies that stay on the server (Sent, Drafts) do keep the header so the sender retains a record.
 
+A non-empty `HTMLBody` produces `multipart/alternative`. When `TextBody` is empty the plain-text half is derived from the markup rather than sent blank, since a `multipart/alternative` with nothing in its text part reads as an empty message in any client that will not render HTML. A `TextBody` that was supplied is always preferred.
+
 ---
 
 ## High-Level Operations
@@ -370,9 +372,12 @@ func StripSubjectPrefix(subject string) string
 func ReplySubject(original string) string   // "Re: <stripped subject>"
 func ForwardSubject(original string) string // "Fwd: <stripped subject>"
 func QuoteBody(original *Message) string
+func QuoteBodyHTML(original *Message) string
 ```
 
 `BuildReplyHeaders` generates correct `In-Reply-To` and `References` chains for Gmail and Apple Mail threading compatibility.
+
+`QuoteBodyHTML` is `QuoteBody` for the HTML half of a reply or forward. An original that was HTML is quoted as its own markup inside a `<blockquote>`, minus script and style blocks; a plain-text original is escaped into a `<pre>`.
 
 `QuoteBody` formats the original message as a quoted reply block, falling back to stripped HTML if no plain text body exists.
 

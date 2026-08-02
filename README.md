@@ -323,7 +323,8 @@ Reconstructs a conversation by following `References`/`In-Reply-To` across the g
 
 ```
 bifrost send --to ADDR [--to ADDR...] --subject TEXT [--cc ADDR...] [--bcc ADDR...]
-             [--from ADDR] [--body TEXT | --body-file PATH] [--attach PATH...] [--no-save]
+             [--from ADDR] [--body TEXT | --body-file PATH] [--body-html TEXT | --body-html-file PATH]
+             [--attach PATH...] [--no-save]
 ```
 
 | Flag | Required | Description |
@@ -333,6 +334,7 @@ bifrost send --to ADDR [--to ADDR...] --subject TEXT [--cc ADDR...] [--bcc ADDR.
 | `--cc` / `--bcc` | No | Additional recipients (repeatable) |
 | `--from` | No | Override From address (e.g. `user+tag@domain`) |
 | `--body` / `--body-file` | No | Message body (see [Body input](#body-input)) |
+| `--body-html` / `--body-html-file` | No | HTML body, sent alongside the plain text one (see [HTML bodies](#html-bodies)) |
 | `--attach` | No | Attachment file path (repeatable) |
 | `--no-save` | No | Don't save a copy to Sent |
 
@@ -344,7 +346,7 @@ JSON output: `{"status": "sent", "messageId": "uuid@hostname"}`.
 
 ```
 bifrost reply [--folder FOLDER] [--all] [--from ADDR] [--no-quote] [--no-save]
-              [--body TEXT | --body-file PATH] <uid>
+              [--body TEXT | --body-file PATH] [--body-html TEXT | --body-html-file PATH] <uid>
 ```
 
 Automatically sets `In-Reply-To`/`References`. Quotes the original by default (`quoteReplies`). `--all` replies to all recipients, never addressing the same person twice or copying your own account.
@@ -355,7 +357,8 @@ Replies go to the original's `Reply-To` when it has one, falling back to `From`.
 
 ```
 bifrost forward --to ADDR [--to ADDR...] [--folder FOLDER] [--from ADDR] [--no-save]
-                [--body TEXT | --body-file PATH] [--attach PATH...] <uid>
+                [--body TEXT | --body-file PATH] [--body-html TEXT | --body-html-file PATH]
+                [--attach PATH...] <uid>
 ```
 
 Original attachments are included automatically; `--attach` appends more.
@@ -428,7 +431,8 @@ JSON output: `[{"address": "...", "displayName": "...", "default": true, "imapHo
 
 ```
 bifrost draft save [--to ADDR...] [--cc ADDR...] [--bcc ADDR...] [--subject TEXT]
-                   [--from ADDR] [--approval] [--body TEXT | --body-file PATH] [--attach PATH...]
+                   [--from ADDR] [--approval] [--body TEXT | --body-file PATH]
+                   [--body-html TEXT | --body-html-file PATH] [--attach PATH...]
 bifrost draft list [--limit N] [--offset N]
 bifrost draft send [--force] [--no-save] <uid>
 bifrost draft approve <uid>
@@ -473,6 +477,25 @@ The `send`, `reply`, `forward`, and `draft save` commands accept a body via thre
 | Stdin pipe | `echo "text" \| bifrost send ...` | Used automatically when stdin is not a terminal |
 
 Precedence: `--body` > `--body-file` > stdin. If none is available and stdin is a terminal, the command returns a usage error (it never hangs waiting for input).
+
+#### HTML bodies
+
+The same four commands take `--body-html TEXT` or `--body-html-file PATH`. Neither reads stdin: a pipe cannot say which of the two bodies it meant, so stdin always belongs to the plain-text one.
+
+Supplying HTML produces a `multipart/alternative` message carrying both versions. The plain-text half is whatever `--body` said; when `--body` is absent it is derived from the markup, so a client that will not render HTML still shows the message rather than an empty one:
+
+```bash
+bifrost send --to bob@example.com --subject "Q3" \
+  --body-html-file report.html                    # text alternative derived
+
+bifrost send --to bob@example.com --subject "Q3" \
+  --body "Revenue is up 12%." \
+  --body-html-file report.html                    # text alternative as written
+```
+
+Deriving is a fallback rather than a conversion: it resolves entities, breaks a line where the markup does, and drops `<script>`, `<style>` and `<head>` content, which is prose in no reader. Write the text half yourself when the wording matters.
+
+On `reply` and `forward` the quoted original is added to both halves, the HTML one as a `<blockquote>`. An original that was itself HTML is quoted as its own markup, minus any script or style blocks, rather than flattened to text.
 
 ### Multi-account
 

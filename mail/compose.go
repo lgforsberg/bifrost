@@ -69,6 +69,14 @@ func composeMessage(opts SendOptions, includeBcc bool) ([]byte, error) {
 	hasAttachments := len(opts.Attachments) > 0
 	hasHTML := opts.HTMLBody != ""
 
+	// An HTML message still gets a text/plain alternative, so it reads as
+	// something in a client that will not render HTML and does not look like
+	// an empty message to a spam filter. Derived only when the caller left it
+	// empty; a text body that was supplied is always preferred.
+	if hasHTML && opts.TextBody == "" {
+		opts.TextBody = htmlToText(opts.HTMLBody)
+	}
+
 	switch {
 	case hasAttachments:
 		// multipart/mixed wrapping body parts + attachments

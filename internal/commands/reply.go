@@ -12,8 +12,7 @@ import (
 func Reply(g *cmdutil.GlobalFlags, args []string) error {
 	fs := flag.NewFlagSet("reply", flag.ContinueOnError)
 	fromAddr := fs.String("from", "", "override From address (e.g. user+tag@domain)")
-	bodyFlag := fs.String("body", "", "reply body")
-	bodyFile := fs.String("body-file", "", "read body from file")
+	bodies := helpers.RegisterBodyFlags(fs, "reply body")
 	all := fs.Bool("all", false, "reply to all recipients")
 	noQuote := fs.Bool("no-quote", false, "don't quote original message")
 	noSave := fs.Bool("no-save", false, "don't save to Sent")
@@ -33,13 +32,7 @@ func Reply(g *cmdutil.GlobalFlags, args []string) error {
 	}
 	uid := uids[0]
 
-	bodySet := false
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "body" {
-			bodySet = true
-		}
-	})
-	body, err := helpers.ReadBody(*bodyFlag, bodySet, *bodyFile)
+	body, htmlBody, err := bodies.Read()
 	if err != nil {
 		return err
 	}
@@ -62,6 +55,12 @@ func Reply(g *cmdutil.GlobalFlags, args []string) error {
 
 	quoteOriginal := g.Config.Defaults.QuoteReplies && !*noQuote
 	opts := mail.BuildReply(*acct, original, body, *all, quoteOriginal)
+	if htmlBody != "" {
+		opts.HTMLBody = htmlBody
+		if quoteOriginal {
+			opts.HTMLBody += mail.QuoteBodyHTML(original)
+		}
+	}
 	if *fromAddr != "" {
 		opts.From.Address = *fromAddr
 	}

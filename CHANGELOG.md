@@ -6,6 +6,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-08-02
+
+### Added
+
+- `--body-html` and `--body-html-file` on `send`, `reply`, `forward` and
+  `draft save`. The library has composed `multipart/alternative` since the
+  start; nothing on the CLI ever set `HTMLBody`.
+- `mail.QuoteBodyHTML`, the HTML counterpart to `QuoteBody`. `reply` and
+  `forward` quote the original in both halves, as a `<blockquote>` in the HTML
+  one. An original that was HTML is quoted as its own markup rather than
+  flattened to text, minus any script or style blocks.
+
+### Changed
+
+- `ComposeMessage` derives the plain-text alternative from the markup when
+  `HTMLBody` is set and `TextBody` is empty. A `multipart/alternative` whose
+  text half is blank reads as an empty message in anything that will not render
+  HTML. A supplied `TextBody` is still preferred.
+- Reply quoting of an HTML original no longer drops a stylesheet or a script
+  into the quoted text, resolves entities, and breaks lines where the markup
+  does.
+
 ## [1.18.0] - 2026-08-02
 
 ### Fixed
@@ -425,7 +447,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.18.0...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.19.0...HEAD
+[1.19.0]: https://github.com/lgforsberg/bifrost/compare/v1.18.0...v1.19.0
 [1.18.0]: https://github.com/lgforsberg/bifrost/compare/v1.17.1...v1.18.0
 [1.17.1]: https://github.com/lgforsberg/bifrost/compare/v1.17.0...v1.17.1
 [1.17.0]: https://github.com/lgforsberg/bifrost/compare/v1.16.0...v1.17.0

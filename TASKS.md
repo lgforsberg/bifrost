@@ -96,9 +96,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
   the six-line inline/attachment split from go-message's `mail` reader. Deliberately not bundled
   into T-032: swapping the walk is a structural change, not a bug fix.
   ↳ since 2026-08-02 · pushed 0 · size M · verified 2026-08-02 · ref `mail/mime.go:ParseMessage part walk`
-- **T-020** HTML sending: `--body-html` on `send`/`reply`/`forward`/`draft save`; the library
-  already composes multipart/alternative, the CLI just never exposes `HTMLBody`.
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-01 · ref `internal/commands/send.go`
 - **T-021** Cross-folder search (repeatable `--folder` or `--all-folders`); triage across
   folders currently needs one invocation per folder.
   ↳ since 2026-08-01 · pushed 0 · size M · verified 2026-08-01 · ref `internal/commands/search.go`
@@ -137,6 +134,13 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-020** `--body-html` / `--body-html-file` on all four composing commands, registered once in
+  `helpers.RegisterBodyFlags` rather than a fifth copy of the same flag-set dance. Composition
+  derives the plain-text alternative when only HTML is given, and `QuoteBodyHTML` quotes the
+  original in the HTML half of a reply or forward.
+  ↳ done 2026-08-02 · evidence: table-driven tests over the HTML-to-text conversion, two compose
+  tests for deriving and for not overriding, two CLI tests round-tripping a draft through the
+  in-memory IMAP server, and body-flag tests that were absent before. v1.19.0
 - **T-034** `draft send` honours `saveToSent` and `--no-save` like the other three send paths.
   Threaded through a new `SendDraftWithOptions` rather than a parameter on `SendDraft`, per the
   rule in CONTRIBUTING: `package mail` is published, so add rather than change a signature.

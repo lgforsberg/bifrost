@@ -780,6 +780,58 @@ func TestDraft_SaveThenListThenDelete(t *testing.T) {
 	}
 }
 
+// --body-html without --body is the shape an agent composing HTML will
+// reach for. The message still has to carry a readable plain-text half.
+func TestDraft_SaveWithHTMLBodyOnly(t *testing.T) {
+	cli := newTestCLI(t)
+
+	err := Draft(cli.g, []string{"save", "--to", "bob@example.com", "--subject", "Report",
+		"--body-html", "<p>Revenue is <b>up</b> &amp; to the right</p>"})
+	if err != nil {
+		t.Fatalf("draft save --body-html: %v", err)
+	}
+	uid := fmt.Sprint(int(cli.decodeObject(t)["uid"].(float64)))
+
+	cli.out.Reset()
+	if err := Read(cli.g, []string{"--folder", "Drafts", "--peek", uid}); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	msg := cli.decodeObject(t)
+
+	if got, ok := msg["htmlBody"].(string); !ok || !strings.Contains(got, "<b>up</b>") {
+		t.Errorf("htmlBody = %v, want the markup as given", msg["htmlBody"])
+	}
+	text, _ := msg["textBody"].(string)
+	if !strings.Contains(text, "Revenue is up & to the right") {
+		t.Errorf("textBody = %q, want prose derived from the HTML", text)
+	}
+}
+
+// Both halves given means both halves sent, untouched.
+func TestDraft_SaveWithBothBodies(t *testing.T) {
+	cli := newTestCLI(t)
+
+	err := Draft(cli.g, []string{"save", "--to", "bob@example.com", "--subject", "Report",
+		"--body", "Revenue is up.", "--body-html", "<p>Revenue is <b>up</b></p>"})
+	if err != nil {
+		t.Fatalf("draft save: %v", err)
+	}
+	uid := fmt.Sprint(int(cli.decodeObject(t)["uid"].(float64)))
+
+	cli.out.Reset()
+	if err := Read(cli.g, []string{"--folder", "Drafts", "--peek", uid}); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	msg := cli.decodeObject(t)
+
+	if text, _ := msg["textBody"].(string); !strings.Contains(text, "Revenue is up.") {
+		t.Errorf("textBody = %q, want the text that was given", text)
+	}
+	if got, _ := msg["htmlBody"].(string); !strings.Contains(got, "<b>up</b>") {
+		t.Errorf("htmlBody = %q, want the markup that was given", got)
+	}
+}
+
 // The point of the approval keyword is that something can come back later and
 // ask what is waiting. Until --keyword existed, nothing could.
 func TestSearch_FindsDraftsAwaitingApproval(t *testing.T) {

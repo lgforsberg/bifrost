@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 )
@@ -51,6 +52,68 @@ func TestComposeMessage_TextAndHTML(t *testing.T) {
 	if !strings.Contains(raw, "multipart/alternative") {
 		t.Error("expected multipart/alternative for text+html")
 	}
+}
+
+// An HTML-only message would otherwise ship a multipart/alternative whose
+// text half is empty, which reads as nothing at all in a client that will not
+// render HTML.
+func TestComposeMessage_DerivesTheTextAlternativeFromHTML(t *testing.T) {
+	opts := SendOptions{
+		From:    Address{Address: "alice@example.com"},
+		To:      []Address{{Address: "bob@example.com"}},
+		Subject: "HTML only",
+		HTMLBody: "<html><head><style>p { color: red }</style></head>" +
+			"<body><p>Ship it &amp; go</p><p>Second line</p></body></html>",
+	}
+
+	parsed := composeAndParse(t, opts)
+
+	if parsed.TextBody == "" {
+		t.Fatal("no plain-text alternative was derived")
+	}
+	if !strings.Contains(parsed.TextBody, "Ship it & go") {
+		t.Errorf("text alternative %q lost the prose or its entities", parsed.TextBody)
+	}
+	if !strings.Contains(parsed.TextBody, "Second line") {
+		t.Errorf("text alternative %q ran the paragraphs together", parsed.TextBody)
+	}
+	if strings.Contains(parsed.TextBody, "color: red") {
+		t.Errorf("text alternative %q carries the stylesheet", parsed.TextBody)
+	}
+	if !strings.Contains(parsed.HTMLBody, "<p>Ship it &amp; go</p>") {
+		t.Errorf("HTML body %q was not sent as given", parsed.HTMLBody)
+	}
+}
+
+// Deriving is a fallback, never an override.
+func TestComposeMessage_KeepsASuppliedTextBody(t *testing.T) {
+	parsed := composeAndParse(t, SendOptions{
+		From:     Address{Address: "alice@example.com"},
+		To:       []Address{{Address: "bob@example.com"}},
+		Subject:  "Both",
+		TextBody: "The words I chose",
+		HTMLBody: "<p>Different words</p>",
+	})
+
+	if !strings.Contains(parsed.TextBody, "The words I chose") {
+		t.Errorf("text body %q was replaced by a derived one", parsed.TextBody)
+	}
+	if strings.Contains(parsed.TextBody, "Different words") {
+		t.Errorf("text body %q picked up the HTML", parsed.TextBody)
+	}
+}
+
+func composeAndParse(t *testing.T, opts SendOptions) *Message {
+	t.Helper()
+	data, err := ComposeMessage(opts)
+	if err != nil {
+		t.Fatalf("ComposeMessage: %v", err)
+	}
+	parsed, err := ParseMessage(bytes.NewReader(data))
+	if err != nil {
+		t.Fatalf("ParseMessage: %v", err)
+	}
+	return parsed
 }
 
 func TestComposeMessage_WithAttachments(t *testing.T) {

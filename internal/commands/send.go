@@ -21,8 +21,7 @@ func Send(g *cmdutil.GlobalFlags, args []string) error {
 	fs.Var(&attachFlag, "attach", "attachment file path (repeatable)")
 	fromAddr := fs.String("from", "", "override From address (e.g. user+tag@domain)")
 	subject := fs.String("subject", "", "message subject")
-	bodyFlag := fs.String("body", "", "message body")
-	bodyFile := fs.String("body-file", "", "read body from file")
+	bodies := helpers.RegisterBodyFlags(fs, "message body")
 	noSave := fs.Bool("no-save", false, "don't save to Sent")
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("usage: %w", err)
@@ -35,13 +34,7 @@ func Send(g *cmdutil.GlobalFlags, args []string) error {
 		return fmt.Errorf("usage: --subject is required")
 	}
 
-	bodySet := false
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "body" {
-			bodySet = true
-		}
-	})
-	body, err := helpers.ReadBody(*bodyFlag, bodySet, *bodyFile)
+	body, htmlBody, err := bodies.Read()
 	if err != nil {
 		return err
 	}
@@ -68,6 +61,7 @@ func Send(g *cmdutil.GlobalFlags, args []string) error {
 		Bcc:         parseAddressFlags(bccFlag),
 		Subject:     *subject,
 		TextBody:    body,
+		HTMLBody:    htmlBody,
 		Attachments: attachments,
 	}
 

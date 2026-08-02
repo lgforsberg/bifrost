@@ -15,8 +15,7 @@ func Forward(g *cmdutil.GlobalFlags, args []string) error {
 	fs.Var(&toFlag, "to", "recipient (repeatable)")
 	fs.Var(&attachFlag, "attach", "additional attachment (repeatable)")
 	fromAddr := fs.String("from", "", "override From address (e.g. user+tag@domain)")
-	bodyFlag := fs.String("body", "", "forwarding body")
-	bodyFile := fs.String("body-file", "", "read body from file")
+	bodies := helpers.RegisterBodyFlags(fs, "forwarding body")
 	noSave := fs.Bool("no-save", false, "don't save to Sent")
 	folder := fs.String("folder", "INBOX", "folder containing the message")
 	args = helpers.ReorderArgs(args, map[string]bool{"no-save": true})
@@ -37,13 +36,7 @@ func Forward(g *cmdutil.GlobalFlags, args []string) error {
 	}
 	uid := uids[0]
 
-	bodySet := false
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "body" {
-			bodySet = true
-		}
-	})
-	body, err := helpers.ReadBody(*bodyFlag, bodySet, *bodyFile)
+	body, htmlBody, err := bodies.Read()
 	if err != nil {
 		return err
 	}
@@ -65,6 +58,11 @@ func Forward(g *cmdutil.GlobalFlags, args []string) error {
 	}
 
 	opts := mail.BuildForward(*acct, original, parseAddressFlags(toFlag), body)
+	// A forward always carries the original, so the HTML alternative quotes it
+	// too. There is no --no-quote here for the same reason.
+	if htmlBody != "" {
+		opts.HTMLBody = htmlBody + mail.QuoteBodyHTML(original)
+	}
 	if *fromAddr != "" {
 		opts.From.Address = *fromAddr
 	}

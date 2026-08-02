@@ -57,20 +57,13 @@ func draftSave(g *cmdutil.GlobalFlags, args []string) error {
 	fs.Var(&attachFlag, "attach", "attachment file path (repeatable)")
 	fromAddr := fs.String("from", "", "override From address (e.g. user+tag@domain)")
 	subject := fs.String("subject", "", "message subject")
-	bodyFlag := fs.String("body", "", "message body")
-	bodyFile := fs.String("body-file", "", "read body from file")
+	bodies := helpers.RegisterBodyFlags(fs, "message body")
 	approval := fs.Bool("approval", false, "mark draft for approval ($PendingApproval keyword)")
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("usage: %w", err)
 	}
 
-	bodySet := false
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "body" {
-			bodySet = true
-		}
-	})
-	body, err := helpers.ReadBody(*bodyFlag, bodySet, *bodyFile)
+	body, htmlBody, err := bodies.Read()
 	if err != nil {
 		return err
 	}
@@ -97,6 +90,7 @@ func draftSave(g *cmdutil.GlobalFlags, args []string) error {
 		Bcc:         parseAddressFlags(bccFlag),
 		Subject:     *subject,
 		TextBody:    body,
+		HTMLBody:    htmlBody,
 		Attachments: attachments,
 	}
 
