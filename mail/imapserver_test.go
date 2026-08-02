@@ -3,15 +3,13 @@ package mail
 import (
 	"context"
 	"errors"
-	"net"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/emersion/go-imap/v2"
-	"github.com/emersion/go-imap/v2/imapserver"
 	"github.com/emersion/go-imap/v2/imapserver/imapmemserver"
+	"github.com/lgforsberg/bifrost/internal/testimap"
 )
 
 const (
@@ -19,101 +17,22 @@ const (
 	testIMAPPass = "secret"
 )
 
-// serverHooks make the memory server do two things it has no way to express on
-// its own, both of which real servers do.
-type serverHooks struct {
-	// listing replaces what LIST reports. imapmemserver never sets special-use
-	// attributes, so this is the only way to hand the client a mailbox that
-	// says what it is for. Mailboxes still have to exist for anything beyond
-	// resolving a name.
-	listing []imap.ListData
-
-	// refuseDelete fails STORE +\Deleted, which is how a mailbox nobody may
-	// delete from behaves. Only that flag is refused, so appending and reading
-	// still work.
-	refuseDelete bool
-}
-
-// hookedSession is the embedding imapmemserver documents: everything is
-// promoted from UserSession, including MOVE, and the hooks override two
-// commands.
-type hookedSession struct {
-	*imapmemserver.UserSession
-	hooks serverHooks
-}
-
-var _ imapserver.SessionIMAP4rev2 = (*hookedSession)(nil)
-
-func (s *hookedSession) List(w *imapserver.ListWriter, ref string, patterns []string, options *imap.ListOptions) error {
-	if s.hooks.listing == nil {
-		return s.UserSession.List(w, ref, patterns, options)
-	}
-	for i := range s.hooks.listing {
-		if err := w.WriteList(&s.hooks.listing[i]); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *hookedSession) Store(w *imapserver.FetchWriter, numSet imap.NumSet, flags *imap.StoreFlags, options *imap.StoreOptions) error {
-	if s.hooks.refuseDelete && flags != nil && slices.Contains(flags.Flags, imap.FlagDeleted) {
-		return &imap.Error{
-			Type: imap.StatusResponseTypeNo,
-			Text: "Permission denied",
-		}
-	}
-	return s.UserSession.Store(w, numSet, flags, options)
-}
-
 func newTestIMAPClient(t *testing.T, account AccountConfig) (*IMAPClient, *imapmemserver.User) {
 	t.Helper()
-	return newTestIMAPClientWithHooks(t, account, serverHooks{})
+	return newTestIMAPClientWithHooks(t, account, testimap.Hooks{})
 }
 
-// newTestIMAPClientWithHooks starts an in-memory IMAP server and returns a
+// newTestIMAPClientWithHooks starts an in-process IMAP server and returns a
 // client connected to it, plus the user so a test can seed mailboxes directly.
-// The server speaks IMAP4rev2, which is what brings MOVE and UIDPLUS: the
-// client needs both.
-func newTestIMAPClientWithHooks(t *testing.T, account AccountConfig, hooks serverHooks) (*IMAPClient, *imapmemserver.User) {
+func newTestIMAPClientWithHooks(t *testing.T, account AccountConfig, hooks testimap.Hooks) (*IMAPClient, *imapmemserver.User) {
 	t.Helper()
 
-	user := imapmemserver.NewUser(testIMAPUser, testIMAPPass)
-	if err := user.Create("INBOX", nil); err != nil {
-		t.Fatalf("creating INBOX: %v", err)
-	}
-
-	srv := imapserver.New(&imapserver.Options{
-		NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
-			return &hookedSession{
-				UserSession: imapmemserver.NewUserSession(user),
-				hooks:       hooks,
-			}, nil, nil
-		},
-		Caps:         imap.CapSet{imap.CapIMAP4rev1: {}, imap.CapIMAP4rev2: {}},
-		InsecureAuth: true,
-	})
-
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	go func() { _ = srv.Serve(ln) }()
-	t.Cleanup(func() { _ = srv.Close() })
-
-	host, portStr, err := net.SplitHostPort(ln.Addr().String())
-	if err != nil {
-		t.Fatalf("splitting listener address: %v", err)
-	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		t.Fatalf("parsing port: %v", err)
-	}
+	srv := testimap.Start(t, testIMAPUser, testIMAPPass, hooks)
 
 	account.Address = testIMAPUser
 	account.Password = testIMAPPass
-	account.IMAPHost = host
-	account.IMAPPort = port
+	account.IMAPHost = srv.Host
+	account.IMAPPort = srv.Port
 	account.IMAPEncryption = "none"
 
 	client := NewIMAPClient(account, discardLogger())
@@ -122,7 +41,7 @@ func newTestIMAPClientWithHooks(t *testing.T, account AccountConfig, hooks serve
 	}
 	t.Cleanup(func() { _ = client.Close() })
 
-	return client, user
+	return client, srv.User
 }
 
 // appendTestMessage puts a minimal message in a mailbox and returns its UID.
@@ -443,8 +362,8 @@ func TestDraft_SaveThenSendLeavesNothingBehind(t *testing.T) {
 // The attribute is what a real server sends and imapmemserver cannot, so
 // until now only the pure matcher covered this. Here it comes off the wire.
 func TestFindSpecialFolder_ReadsAttributesFromTheServer(t *testing.T) {
-	client, _ := newTestIMAPClientWithHooks(t, AccountConfig{}, serverHooks{
-		listing: []imap.ListData{
+	client, _ := newTestIMAPClientWithHooks(t, AccountConfig{}, testimap.Hooks{
+		Listing: []imap.ListData{
 			{Mailbox: "INBOX", Delim: '/'},
 			// A decoy: the conventional English name, on a mailbox that does
 			// not claim to be the archive.
@@ -477,7 +396,7 @@ func TestFindSpecialFolder_ReadsAttributesFromTheServer(t *testing.T) {
 // draft cannot be cleaned up, which is not worth failing a send over.
 func TestSendDraft_WarnsWhenTheDraftWillNotDelete(t *testing.T) {
 	smtpSrv := newTestSMTPServer(t, smtpFailures{})
-	client, user := newTestIMAPClientWithHooks(t, AccountConfig{}, serverHooks{refuseDelete: true})
+	client, user := newTestIMAPClientWithHooks(t, AccountConfig{}, testimap.Hooks{RefuseDelete: true})
 	ctx := context.Background()
 
 	if err := user.Create("Sent", nil); err != nil {

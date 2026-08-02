@@ -3,7 +3,7 @@
 **This file is the single source of truth for what we are working on.** If a task is not
 here, it is not tracked. If it is here, its phase and metadata are current.
 
-> **Next free ID: `T-038`** · IDs are never reused · last full verification sweep **2026-08-01**
+> **Next free ID: `T-039`** · IDs are never reused · last full verification sweep **2026-08-01**
 
 ## How to use this file
 
@@ -81,23 +81,6 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## NEXT
 
-- **T-013** Integration test suite. The library half is done and earning its keep; what is left
-  is the command layer, still almost untested, and the two server behaviours `imapmemserver`
-  cannot produce.
-  - [x] in-process IMAP server. No need to script one: go-imap ships `imapmemserver`, which
-        turned this from an L into an afternoon (`mail/imapserver_test.go`)
-  - [x] append and fetch, trash, archive, folder create/rename/delete and their error codes
-  - [x] the T-006 Sent append warning, and a save-then-send draft round trip across both
-        in-process servers
-  - [x] Search across subject, sender, unseen and limit, and a FetchThread that collects a reply
-  - [x] a draft that will not delete, via a session wrapper that refuses `STORE +\Deleted`.
-        That covers T-006's second warning path
-  - [x] special-use attributes over the wire, via the same wrapper replacing what LIST reports.
-        A decoy mailbox named Archive loses to the one advertising `\Archive`
-  - [ ] golden-file tests for each command's JSON output and error codes. Unblocked by T-024
-  - [x] `internal/commands` has a test file at all (T-036 added the first four)
-  ↳ since 2026-08-01 · pushed 0 · size S · verified 2026-08-02 · ref `mail/imapserver_test.go`
-  ↳ took `mail` from 42.9% to 80.0%, and caught T-037 on the first run
 ## LATER
 
 - **T-034** `draft send` ignores the `saveToSent` default and has no `--no-save`, so it always
@@ -174,6 +157,23 @@ Detail belongs in topic docs, not here. A task is one line plus a pointer.
 
 ## DONE
 
+- **T-013** Integration test suite, done. `internal/testimap` starts an in-process server that
+  both the library and the command tests drive: appends and fetches, trash, archive, folder
+  operations and their response codes, Search, FetchThread, both T-006 warning paths, and every
+  command's JSON shape run through real config loading and account resolution. Error codes are
+  pinned one by one against `classifyError`.
+  ↳ done 2026-08-02 · evidence: `mail` 42.9% to 80.0%, `internal/commands` 2.9% to 34.6%,
+  `cmd/bifrost` 0% to 17.6%. Caught T-037 on its first run and T-038 while being written.
+  ↳ what it does not cover, for whoever picks up the next gap: no test yet drives a real
+  network failure mid-command, and the send commands are covered at the library level rather
+  than through the CLI, because the SMTP harness lives in the `mail` tests.
+- **T-038** A usage error keeps exit code 2 even when the context has been cancelled. The
+  interrupt branch rewrote the message to `interrupted: usage: ...`, which stopped the `usage:`
+  check below it from matching, so the exit code silently became 1. Classification is ordered
+  deliberately now instead of by side effect: usage first, then interrupt, then the sentinels.
+  ↳ done 2026-08-02 · evidence: found writing T-013's error-code table, by predicting the
+  ordering and being wrong. Practically unreachable, since a usage error is decided before any
+  network work, but exit 2 is the documented contract for a bad invocation. v1.10.2
 - **T-024** Command output goes through `GlobalFlags.Out()` and `Err()` rather than the process
   streams, and `classifyError` is split out of `handleError` so the code and exit status can be
   checked without the `os.Exit`. The accessors fall back to the real streams when unset, so

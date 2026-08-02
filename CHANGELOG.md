@@ -6,6 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.10.2] - 2026-08-02
+
+### Fixed
+
+- A usage error exits 2 even if the process was interrupted. The interrupt
+  branch rewrote the message before the `usage:` check ran, so the check no
+  longer matched and the exit code became 1. Unreachable in practice, since a
+  usage error is decided before any network work, but exit 2 is the contract
+  for a bad invocation.
+
+### Added
+
+- Tests for every command's JSON output, driven through real config loading
+  and account resolution against an in-process IMAP server, and for the error
+  code and exit status of each sentinel. Coverage: `internal/commands` from
+  2.9% to 34.6%, `cmd/bifrost` from 0% to 17.6%.
+
 ## [1.10.1] - 2026-08-01
 
 ### Fixed
@@ -274,7 +291,8 @@ Initial public release of Bifrost as a standalone repository.
 - Documentation: `README.md`, `mail/README.md`, `docs/ARCHITECTURE.md`,
   `CONTRIBUTING.md`, and `AGENTS.md`.
 
-[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.10.1...HEAD
+[Unreleased]: https://github.com/lgforsberg/bifrost/compare/v1.10.2...HEAD
+[1.10.2]: https://github.com/lgforsberg/bifrost/compare/v1.10.1...v1.10.2
 [1.10.1]: https://github.com/lgforsberg/bifrost/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/lgforsberg/bifrost/compare/v1.9.1...v1.10.0
 [1.9.1]: https://github.com/lgforsberg/bifrost/compare/v1.9.0...v1.9.1

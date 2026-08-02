@@ -16,7 +16,7 @@ import (
 	"github.com/lgforsberg/bifrost/mail"
 )
 
-const version = "1.10.1"
+const version = "1.10.2"
 
 func main() {
 	globals, args := parseGlobalFlags(os.Args[1:])
@@ -155,6 +155,20 @@ func handleError(g *cmdutil.GlobalFlags, err error) {
 // it, and to the error it describes, which an interrupt rewrites. Separate
 // from handleError so it can be tested without the os.Exit.
 func classifyError(g *cmdutil.GlobalFlags, err error) (code string, exitCode int, reported error) {
+	// Decided before the command did any work, so nothing that happened
+	// afterwards changes what was wrong with the invocation. Exit code 2 has
+	// to hold here or a caller cannot tell a mistyped command from a failed
+	// one.
+	if strings.HasPrefix(err.Error(), "usage:") {
+		return "USAGE_ERROR", 2, err
+	}
+
+	// An interrupt drops the connection underneath the running command, so
+	// whatever error surfaced is a symptom rather than the cause.
+	if g.Ctx != nil && g.Ctx.Err() != nil {
+		return "INTERRUPTED", 1, fmt.Errorf("interrupted: %w", err)
+	}
+
 	code = "UNKNOWN"
 	exitCode = 1
 
@@ -171,19 +185,6 @@ func classifyError(g *cmdutil.GlobalFlags, err error) (code string, exitCode int
 		code = "SEND_REJECTED"
 	case errors.Is(err, mail.ErrInvalidConfig):
 		code = "CONFIG_ERROR"
-		exitCode = 2
-	}
-
-	// An interrupt drops the connection underneath the running command, so
-	// whatever error surfaced is a symptom rather than the cause.
-	if g.Ctx != nil && g.Ctx.Err() != nil {
-		code = "INTERRUPTED"
-		exitCode = 1
-		err = fmt.Errorf("interrupted: %w", err)
-	}
-
-	if strings.HasPrefix(err.Error(), "usage:") {
-		code = "USAGE_ERROR"
 		exitCode = 2
 	}
 
