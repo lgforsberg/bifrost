@@ -1,0 +1,678 @@
+/* ==========================================================================
+   Bifrost — one-page site
+
+   The palette is lifted from assets/bifrost.svg so the page and the app icon
+   agree: a deep slate field with one muted dawn arc running cool blue → sage →
+   sand → clay. That arc is the only saturated thing here and it appears exactly
+   twice, in the hero and on the bridge rule above the demo. Everything else is
+   ink on hairlines.
+   ========================================================================== */
+
+:root {
+  /* Field */
+  --field:      #0b121d;
+  --field-2:    #0e1725;
+  --panel:      #101a2c;
+  --panel-hi:   #172235;
+  --hairline:   #223148;
+  --hairline-2: #2d3f59;
+
+  /* Ink */
+  --ink:        #e8eef5;
+  --ink-2:      #94a4ba;
+  --ink-3:      #64758d;
+
+  /* The arc, straight off the icon */
+  --arc-1:      #8fbfd0;
+  --arc-2:      #d5dec6;
+  --arc-3:      #e1d1ae;
+  --arc-4:      #b58e82;
+  --arc: linear-gradient(90deg,
+          var(--arc-1) 0%, var(--arc-2) 44%, var(--arc-3) 72%, var(--arc-4) 100%);
+
+  /* Type. DM Sans for anything a person reads: near-circular bowls and soft
+     joins, to offset a page that is otherwise all terminal output. Geist Mono
+     for anything the machine said. */
+  --display: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --body:    "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono:    "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Measure and rhythm */
+  --measure: 62ch;
+  --gutter:  clamp(1.25rem, 4vw, 3rem);
+  --bay:     clamp(3.5rem, 7vw, 6rem);
+}
+
+/* --------------------------------------------------------------------------
+   Base
+   -------------------------------------------------------------------------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--field);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 1rem;
+  line-height: 1.62;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.022em;
+  margin: 0;
+  text-wrap: balance;
+}
+
+h1 { font-size: clamp(2.25rem, 4.8vw, 3.4rem); }
+h2 { font-size: clamp(1.7rem, 3.2vw, 2.5rem); }
+h3 { font-size: 1.0625rem; letter-spacing: -0.01em; }
+
+p { margin: 0 0 1rem; }
+
+a { color: var(--arc-1); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+code, pre, kbd { font-family: var(--mono); }
+
+code {
+  font-size: 0.875em;
+  color: var(--arc-2);
+  background: rgba(143, 191, 208, 0.09);
+  padding: 0.1em 0.34em;
+  border-radius: 3px;
+  /* Flags and paths must not break mid-token: "--config" split across two
+     lines reads as two different flags. */
+  white-space: nowrap;
+}
+
+:focus-visible {
+  outline: 2px solid var(--arc-1);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.wrap {
+  width: min(1120px, 100%);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.muted  { color: var(--ink-2); font-size: 0.9375rem; }
+.dim    { color: var(--ink-3); }
+
+.vh {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--panel-hi);
+  color: var(--ink);
+  padding: 0.75rem 1rem;
+  z-index: 20;
+}
+.skip:focus { left: 0; }
+
+/* --------------------------------------------------------------------------
+   Top bar
+   -------------------------------------------------------------------------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--field) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  min-height: 60px;
+}
+
+.brand { display: flex; align-items: center; gap: 0.6rem; color: var(--ink); }
+.brand:hover { text-decoration: none; }
+.brand-mark { width: 26px; height: 26px; display: block; }
+
+.brand-word {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 1.0625rem;
+  letter-spacing: -0.01em;
+}
+
+.topnav { display: flex; align-items: center; gap: 1.5rem; }
+
+.topnav a {
+  color: var(--ink-2);
+  font-size: 0.875rem;
+}
+.topnav a:hover { color: var(--ink); text-decoration: none; }
+
+.topnav-cta {
+  color: var(--ink) !important;
+  border: 1px solid var(--hairline-2);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+}
+.topnav-cta:hover { border-color: var(--arc-1); }
+
+/* --------------------------------------------------------------------------
+   Hero
+   -------------------------------------------------------------------------- */
+
+.hero { padding-block: clamp(2.5rem, 5vw, 4rem) clamp(3rem, 6vw, 4.75rem); }
+
+/* The letter. A message sitting on the page, not a card holding marketing. */
+.letter {
+  width: min(880px, 100%);
+  margin-inline: auto;
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+  border: 1px solid var(--hairline-2);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.letter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem clamp(1.25rem, 3vw, 2.25rem);
+  border-bottom: 1px solid var(--hairline);
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.letter-mark { width: 38px; height: 24px; display: block; }
+
+.letter-from {
+  font-family: var(--mono);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* Headers. Label column sized in ch so the colons line up like a real header
+   block rather than an arbitrary two-column grid. */
+.headers {
+  margin: 0;
+  padding: clamp(1.25rem, 3vw, 1.75rem) clamp(1.25rem, 3vw, 2.25rem) 0;
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.95;
+}
+
+.headers > div { display: grid; grid-template-columns: 15ch minmax(0, 1fr); }
+
+.headers dt { color: var(--ink-3); white-space: nowrap; }
+.headers dt::after { content: ":"; }
+.headers dd { margin: 0; color: var(--ink-2); }
+
+/* RFC 822 separates headers from body with one empty line. That gap is the
+   separator, so it gets no rule. */
+.letter-body {
+  padding: clamp(2.25rem, 5vw, 3.25rem) clamp(1.25rem, 3vw, 2.25rem)
+           clamp(1.75rem, 4vw, 2.5rem);
+}
+
+/* The subject is a header like the others, so it keeps the header's type.
+   Only its value is promoted. */
+.subject-label {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+  margin: 0 0 0.7rem;
+}
+.subject-label::after { content: ":"; }
+
+.hero h1 {
+  font-size: clamp(1.85rem, 3.9vw, 2.85rem);
+  /* Looser than the other headings: tight tracking on a large size reads sharp,
+     which is the opposite of what this face was chosen for. */
+  letter-spacing: -0.012em;
+  line-height: 1.16;
+  margin-bottom: 1.6rem;
+  max-width: 24ch;
+  text-wrap: balance;
+}
+
+.lede {
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  color: var(--ink-2);
+  max-width: 62ch;
+  margin-bottom: 1.9rem;
+}
+
+/* --------------------------------------------------------------------------
+   Command line with copy button
+   -------------------------------------------------------------------------- */
+
+.cmd {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 0.55rem 0.55rem 0.55rem 0.9rem;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.cmd code {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  padding: 0;
+  color: var(--ink);
+  font-size: 0.8125rem;
+  line-height: 1.9;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: thin;
+}
+
+.copy {
+  flex: none;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--ink-2);
+  background: var(--panel-hi);
+  border: 1px solid var(--hairline-2);
+  border-radius: 5px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+.copy:hover { color: var(--ink); border-color: var(--arc-1); }
+
+/* --------------------------------------------------------------------------
+   Sections
+   -------------------------------------------------------------------------- */
+
+.section { padding-block: var(--bay); border-top: 1px solid var(--hairline); }
+
+.section-head { margin-bottom: clamp(2rem, 4vw, 3rem); }
+
+.label {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 0.9rem;
+}
+
+.section-lede {
+  color: var(--ink-2);
+  max-width: var(--measure);
+  margin-top: 1.1rem;
+}
+
+/* --------------------------------------------------------------------------
+   Code blocks
+   -------------------------------------------------------------------------- */
+
+pre {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.75;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  tab-size: 2;
+}
+
+pre.block {
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 1.1rem 1.25rem;
+  color: var(--ink);
+}
+
+pre.wide { padding: 1.5rem; }
+
+pre .p { color: var(--arc-4); user-select: none; }
+pre .j { color: var(--arc-2); }
+pre .k { color: var(--arc-1); }
+pre .s { color: var(--arc-3); }
+
+/* --------------------------------------------------------------------------
+   The bridge: one command, two readers
+   -------------------------------------------------------------------------- */
+
+.switchbox { position: relative; }
+
+/* The bridge itself. The switch sits on it, so choosing a reading is
+   literally crossing from one side to the other. */
+.bridge-rule {
+  height: 3px;
+  background: var(--arc);
+  border-radius: 3px;
+  opacity: 0.9;
+  box-shadow: 0 0 22px rgba(213, 222, 198, 0.22);
+}
+
+.switch {
+  position: relative;
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  margin: -1.45rem auto 1.9rem;
+  padding: 4px;
+  background: var(--field);
+  border: 1px solid var(--hairline-2);
+  border-radius: 999px;
+  /* Opens a gap in the bridge so the rule reads as passing behind. */
+  box-shadow: 0 0 0 7px var(--field);
+}
+
+.switch label {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+  padding: 0.55rem 1.15rem;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color .18s, background .18s;
+}
+.switch label:hover { color: var(--ink-2); }
+
+#view-human:checked ~ .switch label[for="view-human"],
+#view-agent:checked ~ .switch label[for="view-agent"] {
+  color: var(--field);
+  background: var(--arc-2);
+}
+
+#view-human:focus-visible ~ .switch label[for="view-human"],
+#view-agent:focus-visible ~ .switch label[for="view-agent"] {
+  outline: 2px solid var(--arc-1);
+  outline-offset: -2px;
+}
+
+.pane { display: none; }
+
+#view-human:checked ~ .pane-human,
+#view-agent:checked ~ .pane-agent { display: block; }
+
+.pane pre {
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 1.25rem 1.4rem;
+}
+
+.pane-note {
+  margin: 0.9rem 0 0;
+  font-size: 0.875rem;
+  color: var(--ink-3);
+  max-width: var(--measure);
+}
+
+/* --------------------------------------------------------------------------
+   Contract
+   -------------------------------------------------------------------------- */
+
+.contract-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: clamp(2rem, 4vw, 3.5rem);
+  align-items: start;
+}
+
+.contract pre.wide { margin-bottom: clamp(2rem, 4vw, 3rem); }
+
+.codes { list-style: none; margin: 0; padding: 0; }
+
+.codes li {
+  display: grid;
+  grid-template-columns: 12.5rem minmax(0, 1fr);
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 0.875rem;
+}
+.codes li:first-child { border-top: 1px solid var(--hairline); }
+.codes code { background: none; padding: 0; color: var(--arc-3); }
+.codes span { color: var(--ink-2); }
+
+.contract-side { display: grid; gap: 1.5rem; }
+
+.fact {
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 1.4rem 1.5rem;
+}
+
+.fact h3 {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 1rem;
+}
+
+.exits {
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  gap: 0.5rem 0.75rem;
+  margin: 0;
+  font-size: 0.9375rem;
+}
+.exits dt { font-family: var(--mono); color: var(--arc-1); }
+.exits dd { margin: 0; color: var(--ink-2); }
+
+.ticks { list-style: none; margin: 0; padding: 0; }
+
+.ticks li {
+  position: relative;
+  padding-left: 1.35rem;
+  margin-bottom: 0.7rem;
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+}
+.ticks li:last-child { margin-bottom: 0; }
+
+.ticks li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.72em;
+  width: 0.7rem;
+  height: 1px;
+  background: var(--arc-4);
+}
+
+/* --------------------------------------------------------------------------
+   Feature and command grids
+   -------------------------------------------------------------------------- */
+
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(2rem, 4vw, 3.5rem); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(1.75rem, 3.5vw, 3rem); }
+.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(1.5rem, 3vw, 2.5rem); }
+
+.features article h3 { margin-bottom: 0.6rem; }
+
+.features article p {
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+  margin: 0;
+}
+
+.features article {
+  padding-top: 1.15rem;
+  border-top: 1px solid var(--hairline-2);
+}
+
+.verbs h3 {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding-bottom: 0.85rem;
+  margin-bottom: 0.85rem;
+  border-bottom: 1px solid var(--hairline-2);
+}
+
+.verbs ul { list-style: none; margin: 0; padding: 0; }
+
+.verbs li {
+  font-size: 0.875rem;
+  color: var(--ink-3);
+  margin-bottom: 0.65rem;
+}
+
+.verbs code {
+  background: none;
+  padding: 0;
+  color: var(--ink);
+  font-size: 0.8125rem;
+  margin-right: 0.3rem;
+}
+
+.commands-note {
+  margin: clamp(2rem, 4vw, 3rem) 0 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--hairline);
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+}
+
+/* --------------------------------------------------------------------------
+   Install
+   -------------------------------------------------------------------------- */
+
+.step {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 1rem;
+}
+
+.cmd-wide { max-width: 44rem; }
+
+.install-req { margin: 0.85rem 0 clamp(2rem, 4vw, 3rem); }
+.install pre.block { margin-bottom: 1rem; }
+.install .muted { max-width: 52ch; }
+
+/* --------------------------------------------------------------------------
+   Closing and footer
+   -------------------------------------------------------------------------- */
+
+.closing-inner { text-align: center; }
+.closing-inner h2 { margin-bottom: 0.9rem; }
+.closing-inner .muted { margin-bottom: 2rem; }
+
+.cta-row { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; margin: 0; }
+
+.btn {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  color: var(--field);
+  background: var(--arc-2);
+  border: 1px solid var(--arc-2);
+  border-radius: 6px;
+  padding: 0.7rem 1.4rem;
+  transition: opacity .15s;
+}
+.btn:hover { opacity: 0.88; text-decoration: none; }
+
+.btn-quiet {
+  color: var(--ink);
+  background: none;
+  border-color: var(--hairline-2);
+}
+.btn-quiet:hover { border-color: var(--arc-1); opacity: 1; }
+
+.footer {
+  border-top: 1px solid var(--hairline);
+  padding-block: 2.5rem;
+}
+
+.footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 2rem;
+  font-size: 0.875rem;
+  color: var(--ink-3);
+}
+.footer-inner p { margin: 0; }
+
+/* --------------------------------------------------------------------------
+   Narrow screens
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 940px) {
+  /* minmax(0,…) rather than 1fr: an auto-minimum track refuses to shrink below
+     its widest unbreakable child and pushes the page into horizontal scroll. */
+  .contract-grid { grid-template-columns: minmax(0, 1fr); }
+  .grid-2 { grid-template-columns: minmax(0, 1fr); }
+  .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .topnav a:not(.topnav-cta) { display: none; }
+}
+
+@media (max-width: 620px) {
+  /* Header labels stack above their values: 13ch of label leaves nothing for
+     the value at this width. */
+  .headers > div { grid-template-columns: minmax(0, 1fr); }
+  .headers { line-height: 1.5; }
+  .headers > div + div { margin-top: 0.7rem; }
+  .grid-3, .grid-4 { grid-template-columns: minmax(0, 1fr); }
+  /* Too narrow to straddle the rule, so the pill drops below it instead of
+     covering it entirely. */
+  .switch { width: 100%; margin-top: 1.1rem; box-shadow: none; }
+  .switch label {
+    flex: 1;
+    text-align: center;
+    font-size: 0.6875rem;
+    letter-spacing: 0;
+    padding: 0.55rem 0.4rem;
+  }
+  .codes li { grid-template-columns: 1fr; gap: 0.15rem; }
+  .footer-inner { flex-direction: column; }
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

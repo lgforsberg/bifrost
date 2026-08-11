@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bifrost — a command-line email client with no one at the keyboard</title>
+<meta name="description" content="Bifrost is a fast, scriptable command-line email client and Go library. It speaks IMAP, SMTP and MIME against any standards-compliant provider, never prompts, and returns structured JSON on every command.">
+
+<link rel="canonical" href="https://bifrost-mail.com/">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://bifrost-mail.com/">
+<meta property="og:site_name" content="Bifrost">
+<meta property="og:title" content="Bifrost — a command-line email client with no one at the keyboard">
+<meta property="og:description" content="IMAP, SMTP and MIME from the command line. No TTY assumptions, no prompts, structured JSON on every command. MIT licensed, written in Go.">
+<!-- Absolute: scrapers do not resolve relative og:image. -->
+<meta property="og:image" content="https://bifrost-mail.com/img/bifrost.png">
+<meta name="twitter:card" content="summary">
+
+<link rel="icon" href="img/bifrost.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/bifrost.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Geist+Mono:wght@400;500&display=swap">
+
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="#top">
+      <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="markArc" x1="10" y1="0" x2="54" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#8FBFD0"/>
+            <stop offset="0.44" stop-color="#D5DEC6"/>
+            <stop offset="0.72" stop-color="#E1D1AE"/>
+            <stop offset="1" stop-color="#B58E82"/>
+          </linearGradient>
+        </defs>
+        <rect x="1.5" y="1.5" width="61" height="61" rx="15" fill="#141F31" stroke="#33455F" stroke-opacity=".5"/>
+        <path d="M14 44C14 27.4 22.6 19 32 19C41.4 19 50 27.4 50 44"
+              fill="none" stroke="url(#markArc)" stroke-width="4" stroke-linecap="round"/>
+      </svg>
+      <span class="brand-word">bifrost</span>
+    </a>
+
+    <nav class="topnav" aria-label="Primary">
+      <a href="#bridge">Demo</a>
+      <a href="#contract">Contract</a>
+      <a href="#commands">Commands</a>
+      <a href="#install">Install</a>
+      <a class="topnav-cta" href="https://github.com/lgforsberg/bifrost">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ─────────────────────────────  HERO  ─────────────────────────────
+       Set as an RFC 822 message, which is the thing Bifrost actually composes.
+       The headers carry the facts a hero normally puts in an eyebrow and a row
+       of badges, and the gap before the body is the blank line the spec puts
+       between headers and body. Nothing here is decoration.
+       ────────────────────────────────────────────────────────────────── -->
+  <section class="hero" id="top">
+    <div class="wrap">
+      <article class="letter">
+
+        <div class="letter-bar">
+          <svg class="letter-mark" viewBox="0 0 64 40" aria-hidden="true" focusable="false">
+            <defs>
+              <linearGradient id="letterArc" x1="6" y1="0" x2="58" y2="0" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#8FBFD0"/>
+                <stop offset="0.44" stop-color="#D5DEC6"/>
+                <stop offset="0.72" stop-color="#E1D1AE"/>
+                <stop offset="1" stop-color="#B58E82"/>
+              </linearGradient>
+            </defs>
+            <path d="M6 34C6 15.4 17.6 7 32 7C46.4 7 58 15.4 58 34"
+                  fill="none" stroke="url(#letterArc)" stroke-width="4" stroke-linecap="round"/>
+          </svg>
+          <span class="letter-from">bifrost</span>
+        </div>
+
+        <dl class="headers">
+          <div><dt>From</dt><dd>bifrost 1.25.1, a command-line mail client</dd></div>
+          <div><dt>To</dt><dd>stdout, and whatever is reading it</dd></div>
+          <div><dt>Content-Type</dt><dd>application/json, or text/plain for humans</dd></div>
+          <div><dt>X-Protocols</dt><dd>IMAP, SMTP, MIME</dd></div>
+          <div><dt>X-License</dt><dd>MIT, written in Go</dd></div>
+        </dl>
+
+        <div class="letter-body">
+          <p class="subject-label">Subject</p>
+          <h1>A mail client with no one at the keyboard.</h1>
+
+          <p class="lede">
+            Bifrost speaks IMAP, SMTP and MIME against any standards-compliant provider.
+            The CLI is built for non-interactive and agent-driven use: no TTY assumptions,
+            no editor spawning, no prompts, and structured <code>--json</code> output on
+            every command.
+          </p>
+
+          <div class="cmd" data-copy>
+            <code>go install github.com/lgforsberg/bifrost/cmd/bifrost@latest</code>
+            <button type="button" class="copy" aria-label="Copy install command">Copy</button>
+          </div>
+        </div>
+
+      </article>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────  THE BRIDGE DEMO  ────────────────────── -->
+  <section class="section bridge" id="bridge">
+    <div class="wrap">
+
+      <header class="section-head">
+        <p class="label">The bridge</p>
+        <h2>One command, two readers.</h2>
+        <p class="section-lede">
+          Every command renders for a person by default and for a program with
+          <code>--json</code>. Same call, same data, two readings. Cross the bridge.
+        </p>
+      </header>
+
+      <div class="switchbox" role="group" aria-label="Output format">
+        <input class="vh" type="radio" name="view" id="view-human" checked>
+        <input class="vh" type="radio" name="view" id="view-agent">
+
+        <div class="bridge-rule" aria-hidden="true"></div>
+
+        <div class="switch">
+          <label for="view-human">as a person reads it</label>
+          <label for="view-agent">as a program reads it</label>
+        </div>
+
+        <div class="pane pane-human">
+          <pre><span class="p">$</span> bifrost inbox --limit 3
+<span class="dim">UID   FLAGS  DATE              FROM                SUBJECT
+----  -----  ----------------  ------------------  ----------------------------</span>
+1841  R      2026-08-11 09:14  Skatteetaten        Your tax return is available
+1842         2026-08-11 11:02  Nordic Domain Days  Re: Speaker confirmation
+1843  RF     2026-08-11 16:47  DNB                 Mortgage: documents received</pre>
+          <p class="pane-note">
+            Columns are padded to fit. <code>R</code> read, <code>F</code> flagged,
+            <code>A</code> answered, <code>D</code> draft.
+          </p>
+        </div>
+
+        <div class="pane pane-agent">
+          <pre><span class="p">$</span> bifrost --json inbox --limit 3 | jq -c '.[] | {uid, subject, flags}'
+<span class="j">{"uid":1841,"subject":"Your tax return is available","flags":["\\Seen"]}</span>
+<span class="j">{"uid":1842,"subject":"Re: Speaker confirmation","flags":[]}</span>
+<span class="j">{"uid":1843,"subject":"Mortgage: documents received","flags":["\\Seen","\\Flagged"]}</span></pre>
+          <p class="pane-note">
+            Raw output is indented JSON with camelCase fields and full addresses.
+            <code>jq</code> is only here to keep the example short.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ────────────────────────  THE AGENT CONTRACT  ──────────────────── -->
+  <section class="section contract" id="contract">
+    <div class="wrap">
+
+      <header class="section-head">
+        <p class="label">The contract</p>
+        <h2>Failure is data too.</h2>
+        <p class="section-lede">
+          A caller that cannot read prose needs to know what went wrong without
+          parsing a sentence. Errors come back in the same shape as everything else,
+          with a code that is safe to branch on.
+        </p>
+      </header>
+
+      <pre class="block wide"><span class="p">$</span> bifrost --json read 999
+<span class="j">{"error": true, "code": "NOT_FOUND", "message": "message uid 999 in INBOX: not found"}</span></pre>
+
+      <div class="contract-grid">
+
+        <div class="contract-main">
+          <ul class="codes">
+            <li><code>NOT_FOUND</code><span>Message UID or resource doesn't exist</span></li>
+            <li><code>ALREADY_EXISTS</code><span>Folder already exists</span></li>
+            <li><code>AUTH_FAILED</code><span>IMAP/SMTP authentication failed</span></li>
+            <li><code>CONNECTION_FAILED</code><span>Could not connect to server</span></li>
+            <li><code>SEND_REJECTED</code><span>SMTP server rejected the message</span></li>
+            <li><code>PENDING_APPROVAL</code><span>Draft is awaiting approval</span></li>
+            <li><code>CONFIG_ERROR</code><span>Configuration is missing or invalid</span></li>
+            <li><code>USAGE_ERROR</code><span>Bad flags or arguments</span></li>
+            <li><code>INTERRUPTED</code><span>Cancelled before completing</span></li>
+            <li><code>UNKNOWN</code><span>Anything not otherwise classified</span></li>
+          </ul>
+        </div>
+
+        <aside class="contract-side">
+          <div class="fact">
+            <h3>Exit codes</h3>
+            <dl class="exits">
+              <dt>0</dt><dd>Success, and <code>help</code></dd>
+              <dt>1</dt><dd>Operational failure</dd>
+              <dt>2</dt><dd>Usage error</dd>
+            </dl>
+          </div>
+
+          <div class="fact">
+            <h3>Promises</h3>
+            <ul class="ticks">
+              <li>Never prompts, never spawns an editor</li>
+              <li><code>help</code> works without a valid config</li>
+              <li>A flag given no value stops rather than defaulting</li>
+              <li>Bulk operations report <code>skippedUids</code> instead of failing the batch</li>
+              <li>Bifrost does not acquire OAuth tokens itself: it runs a command you name and reads the token from stdout</li>
+            </ul>
+          </div>
+        </aside>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ────────────────────────────  FEATURES  ────────────────────────── -->
+  <section class="section features">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="label">What it does</p>
+        <h2>A whole mail client, minus the interface.</h2>
+      </header>
+
+      <div class="grid-3">
+        <article>
+          <h3>IMAP</h3>
+          <p>Folder management, envelope listing with pagination, message fetch,
+             move, delete and flag, and server-side <code>SEARCH</code>. Special
+             folders are found through IMAP special-use rather than guessed by name.</p>
+        </article>
+        <article>
+          <h3>SMTP</h3>
+          <p>RFC 2822 composition, MIME multipart with attachments, and
+             plus-address (<code>user+tag@</code>) envelope handling.</p>
+        </article>
+        <article>
+          <h3>Threading</h3>
+          <p>Conversations reconstructed across folders through
+             <code>In-Reply-To</code> and <code>References</code>, with reply and
+             forward headers that Gmail and Apple Mail agree with.</p>
+        </article>
+        <article>
+          <h3>Drafts</h3>
+          <p>Save, list, send and delete, with an optional approval keyword so a
+             draft written by a program waits for a human before it goes out.</p>
+        </article>
+        <article>
+          <h3>Multi-account</h3>
+          <p>Flexible account matching by partial name, and per-account overrides
+             for Sent, Drafts, Trash and Archive.</p>
+        </article>
+        <article>
+          <h3>Damaged mail</h3>
+          <p>Parsing is best-effort and says so. Truncated parts and undecodable
+             charsets come back with a <code>warnings</code> list rather than an
+             empty result.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────  COMMAND SURFACE  ────────────────────── -->
+  <section class="section commands" id="commands">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="label">The surface</p>
+        <h2>Twenty-odd verbs, grouped by what they touch.</h2>
+      </header>
+
+      <div class="grid-4">
+        <div class="verbs">
+          <h3>Read</h3>
+          <ul>
+            <li><code>inbox</code> list a folder</li>
+            <li><code>read</code> fetch one message</li>
+            <li><code>search</code> server-side IMAP search</li>
+            <li><code>thread</code> follow a conversation</li>
+          </ul>
+        </div>
+        <div class="verbs">
+          <h3>Write</h3>
+          <ul>
+            <li><code>send</code> compose and send</li>
+            <li><code>reply</code> reply in thread</li>
+            <li><code>forward</code> pass it on</li>
+            <li><code>draft</code> save, list, approve, send</li>
+          </ul>
+        </div>
+        <div class="verbs">
+          <h3>Organise</h3>
+          <ul>
+            <li><code>archive</code> · <code>move</code> · <code>delete</code></li>
+            <li><code>mark-read</code> · <code>mark-unread</code></li>
+            <li><code>flag</code> · <code>unflag</code></li>
+            <li><code>folder</code> list, status, create, rename, delete</li>
+          </ul>
+        </div>
+        <div class="verbs">
+          <h3>Set up</h3>
+          <ul>
+            <li><code>config init</code> write a template</li>
+            <li><code>accounts</code> list what is configured</li>
+            <li><code>version</code> · <code>help</code></li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="commands-note">
+        Global flags go before the command: <code>--account</code>,
+        <code>--json</code>, <code>--verbose</code>, <code>--config</code>,
+        <code>--timeout</code>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────  INSTALL  ────────────────────────── -->
+  <section class="section install" id="install">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="label">Install</p>
+        <h2>Three commands to a first inbox.</h2>
+      </header>
+
+      <div class="cmd cmd-wide" data-copy>
+        <code>go install github.com/lgforsberg/bifrost/cmd/bifrost@latest</code>
+        <button type="button" class="copy" aria-label="Copy install command">Copy</button>
+      </div>
+      <p class="muted install-req">Requires Go 1.25 or newer.</p>
+
+      <div class="grid-2">
+        <div>
+          <h3 class="step">Or build from source</h3>
+          <pre class="block">git clone https://github.com/lgforsberg/bifrost
+cd bifrost
+make build      <span class="dim"># produces ./bin/bifrost</span></pre>
+        </div>
+
+        <div>
+          <h3 class="step">Point it at a mailbox</h3>
+          <pre class="block"><span class="dim"># 1. Generate a config template</span>
+bifrost config init
+
+<span class="dim"># 2. Edit ~/.bifrost/config.json</span>
+
+<span class="dim"># 3. Go</span>
+bifrost inbox</pre>
+          <p class="muted">
+            Config lives at <code>~/.bifrost/config.json</code>, overridable with
+            <code>--config</code> or <code>BIFROST_CONFIG</code>. Gmail and
+            Microsoft 365 need OAuth2: set <code>authMechanism</code> and give
+            Bifrost a <code>tokenCommand</code> that prints an access token.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────  LIBRARY  ────────────────────────── -->
+  <section class="section library">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="label">Library</p>
+        <h2>Or skip the CLI and import the engine.</h2>
+        <p class="section-lede">
+          The CLI is a thin shell over <code>mail</code>. The same package is
+          importable on its own.
+        </p>
+      </header>
+
+      <pre class="block wide"><span class="k">import</span> <span class="s">"github.com/lgforsberg/bifrost/mail"</span>
+
+client := mail.NewIMAPClient(account, logger)
+<span class="k">if</span> err := client.Connect(ctx); err != <span class="k">nil</span> {
+    <span class="k">return</span> err
+}
+<span class="k">defer</span> client.Close()
+
+envelopes, _ := client.ListEnvelopes(ctx, <span class="s">"INBOX"</span>, 10, 0)
+msg, _ := client.FetchMessage(ctx, <span class="s">"INBOX"</span>, envelopes[0].UID, <span class="k">true</span>)
+
+opts := mail.BuildReply(account, msg, <span class="s">"Thanks!"</span>, <span class="k">false</span>, <span class="k">true</span>)
+res, err := mail.Send(ctx, account, client, opts, <span class="k">true</span>, logger)</pre>
+
+      <p class="muted">
+        Full API reference in <code>mail/README.md</code>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ──────────────────────────────  CTA  ───────────────────────────── -->
+  <section class="section closing">
+    <div class="wrap closing-inner">
+      <h2>Bifrost is on GitHub, under MIT.</h2>
+      <p class="muted">Issues, forks and patches all welcome.</p>
+      <p class="cta-row">
+        <a class="btn" href="https://github.com/lgforsberg/bifrost">View the repository</a>
+        <a class="btn btn-quiet" href="https://github.com/lgforsberg/bifrost#readme">Read the manual</a>
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <p>Bifrost · MIT · written in Go by
+       <a href="https://github.com/lgforsberg">lgforsberg</a></p>
+    <p class="muted">Named for the bridge, which also only ever went two places.</p>
+  </div>
+</footer>
+
+<script>
+  // navigator.clipboard is undefined outside a secure context, so a site served
+  // over plain http needs the textarea fallback or the button silently lies.
+  function legacyCopy(text) {
+    return new Promise(function (resolve, reject) {
+      var field = document.createElement('textarea');
+      field.value = text;
+      field.setAttribute('readonly', '');
+      field.style.position = 'fixed';
+      field.style.opacity = '0';
+      document.body.appendChild(field);
+      field.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(field);
+      ok ? resolve() : reject(new Error('copy rejected'));
+    });
+  }
+
+  function writeClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).catch(function () {
+        return legacyCopy(text);
+      });
+    }
+    return legacyCopy(text);
+  }
+
+  document.querySelectorAll('[data-copy]').forEach(function (box) {
+    var button = box.querySelector('.copy');
+    var text = box.querySelector('code').textContent.trim();
+
+    button.addEventListener('click', function () {
+      var settle = function (label) {
+        button.textContent = label;
+        setTimeout(function () { button.textContent = 'Copy'; }, 1800);
+      };
+      writeClipboard(text).then(
+        function () { settle('Copied'); },
+        function () { settle('Select it'); }
+      );
+    });
+  });
+</script>
+
+</body>
+</html>
