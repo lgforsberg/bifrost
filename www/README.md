@@ -1,4 +1,4 @@
-# www — the Bifrost site
+# www: the Bifrost site
 
 A one-page static site for Bifrost. No build step, no framework, no package
 manager. Three files and two images.
